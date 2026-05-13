@@ -1,0 +1,24 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "cross-env FAMILY_OFFICE_SQLITE=:memory: SKIP_WORKBOOK_BOOTSTRAP=1 vitest run",
+    "test:watch": "cross-env FAMILY_OFFICE_SQLITE=:memory: SKIP_WORKBOOK_BOOTSTRAP=1 vitest"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "supertest": "^7.1.1",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5"
+  }
+}
