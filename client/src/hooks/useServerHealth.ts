@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import { apiFetch } from '../lib/api'
+import { USE_SESSION_COOKIE } from '../lib/api'
+
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 export type CredentialStore = 'demo' | 'env' | 'sqlite'
 
@@ -23,14 +25,25 @@ export function useServerHealth() {
     let c = false
     ;(async () => {
       try {
-        const h = await apiFetch<{ version?: string; auth?: HealthAuth }>('/api/health', {})
+        const res = await fetch(`${API_BASE}/api/health`, {
+          credentials: USE_SESSION_COOKIE ? 'include' : 'same-origin',
+        })
+        const body = (await res.json().catch(() => ({}))) as {
+          version?: string
+          auth?: HealthAuth
+          error?: string
+          hint?: string
+        }
+        if (!res.ok) {
+          throw new Error(body.hint || body.error || res.statusText)
+        }
         if (c) return
         setApiOnline(true)
-        if (typeof h.version === 'string' && h.version.length) setVersion(h.version)
-        setAuth(h.auth ?? null)
-        const cs = h.auth?.credentialStore
+        if (typeof body.version === 'string' && body.version.length) setVersion(body.version)
+        setAuth(body.auth ?? null)
+        const cs = body.auth?.credentialStore
         if (cs === 'env' || cs === 'sqlite' || cs === 'demo') setCredentialStore(cs)
-        else if (h.auth?.userSource === 'configured') setCredentialStore('env')
+        else if (body.auth?.userSource === 'configured') setCredentialStore('env')
         else setCredentialStore('demo')
       } catch {
         if (!c) {

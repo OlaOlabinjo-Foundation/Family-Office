@@ -1,0 +1,35 @@
+# One-click API + UI (recommended for production).
+# Deploy at https://render.com — connect this repo and apply this Blueprint.
+# For Vercel frontend only, deploy this API service and set COMMAND_CENTRE_API_URL on Vercel.
+
+services:
+  - type: web
+    name: ooi-family-office
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FAMILY_OFFICE_AUTH
+        value: sqlite
+      - key: FAMILY_OFFICE_SQLITE
+        value: /var/data/family-office.sqlite
+      - key: FAMILY_OFFICE_VAULT_DIR
+        value: /var/data/vault
+      - key: FAMILY_OFFICE_MFA_REQUIRED
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FAMILY_OFFICE_MFA_KEY
+        generateValue: true
+      - key: FAMILY_OFFICE_CORS_ORIGINS
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+    disk:
+      name: fo-data
+      mountPath: /var/data
+      sizeGB: 2

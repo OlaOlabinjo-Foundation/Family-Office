@@ -198,11 +198,22 @@ export function Login() {
 
         {apiOnline === false ? (
           <div role="alert" className="mt-6 rounded-md border border-fo-red/40 bg-fo-red/10 px-3 py-2 text-sm text-fo-red leading-relaxed">
-            <strong className="text-fo-red">API offline.</strong> The sign-in page cannot reach{' '}
-            <code className="text-fo-red/90">/api/health</code>. Run{' '}
-            <code className="text-fo-red/90">npm run dev</code> from the project folder (starts API on port 8787 and UI on
-            5173), or configure <code className="text-fo-red/90">VITE_API_URL</code> if you deployed the UI only (e.g.
-            Vercel).
+            <strong className="text-fo-red">API offline.</strong> This site cannot reach{' '}
+            <code className="text-fo-red/90">/api/health</code>.
+            {typeof window !== 'undefined' &&
+            !/localhost|127\.0\.0\.1/.test(window.location.hostname) ? (
+              <>
+                {' '}
+                On Vercel, set <code className="text-fo-red/90">COMMAND_CENTRE_API_URL</code> to your hosted API (e.g.
+                Render) and redeploy — see README “Going live”. Locally, run{' '}
+                <code className="text-fo-red/90">npm run dev</code>.
+              </>
+            ) : (
+              <>
+                {' '}
+                Run <code className="text-fo-red/90">npm run dev</code> from the project folder (API on 8787, UI on 5173).
+              </>
+            )}
           </div>
         ) : null}
 

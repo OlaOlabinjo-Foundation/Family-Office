@@ -21,6 +21,47 @@ Do **not** run `npx serve .` from the repo root: there is no app `index.html` th
 | **Production-like** — one process | `npm start` | **http://localhost:8787** |
 | **Preview** — built assets + separate API | Terminal 1: `npm run dev -w server` · Terminal 2: `npm run preview` | **http://localhost:4173** |
 
+## Going live (Vercel + API)
+
+The React UI on **Vercel** is static only — it does **not** include the database or Express API. You must host the API separately and connect Vercel to it.
+
+### Step 1 — Deploy the API (Render, recommended)
+
+1. Push this repo to GitHub.
+2. On [Render](https://render.com), **New → Blueprint** and select the repo (uses [`render.yaml`](render.yaml)).
+3. After deploy, open the service URL and confirm `https://YOUR-SERVICE.onrender.com/api/health` returns JSON.
+4. Seed the lead user (Render shell or locally against the service):
+
+```bash
+npm run seed-user -w server -- lead "Family Office Lead" lead "YourSecurePassword"
+```
+
+Set `FAMILY_OFFICE_CORS_ORIGINS` on Render to your Vercel URL, e.g. `https://your-project.vercel.app`.
+
+### Step 2 — Connect Vercel
+
+1. In Vercel → your project → **Settings → General**:
+   - **Root Directory** = `.` (repo root) **or** `client` (both include an `/api` proxy).
+   - If using root `.`, Build Command = `npm run build`, Output = `client/dist` (see root [`vercel.json`](vercel.json)).
+   - If using `client`, defaults from [`client/vercel.json`](client/vercel.json) apply.
+2. **Environment variables** → add:
+
+| Name | Value |
+|------|--------|
+| `COMMAND_CENTRE_API_URL` | `https://YOUR-SERVICE.onrender.com` (no trailing slash) |
+
+3. **Redeploy** the project (required after adding the variable).
+
+The repo includes [`api/[...path].js`](api/[...path].js), which proxies browser calls from `https://your-app.vercel.app/api/*` to your Render API (same-origin, no CORS issues).
+
+### Alternative — single host (no Vercel)
+
+Run `npm start` on Render/Railway/VPS with `render.yaml` — one URL serves UI + API. Point your domain at that service only.
+
+### Alternative — `VITE_API_URL` only
+
+Instead of the Vercel proxy, set `VITE_API_URL=https://YOUR-SERVICE.onrender.com` at **build time** on Vercel and set `FAMILY_OFFICE_CORS_ORIGINS` on the API to your Vercel origin.
+
 ## Backups
 
 - **Before import:** the API writes `pre-import-*.sqlite` under `backups/` beside your database file.
@@ -121,6 +162,12 @@ Roles: `chairman`, `lead`, `analyst`, `viewer`.
 | `VITE_API_URL` | Base URL for API (empty = same origin). |
 | `VITE_HELP_CENTER_URL` | Optional link shown on **Help** as “Customer hub” (Notion / Google Doc). |
 | `VITE_SESSION_COOKIE` | Set to `1` when API uses `FAMILY_OFFICE_SESSION_COOKIE=1` (httpOnly cookie sessions). |
+
+## Environment (Vercel)
+
+| Variable | Purpose |
+|----------|---------|
+| `COMMAND_CENTRE_API_URL` | **Required** for live sign-in. HTTPS URL of the hosted API (e.g. Render). Proxied via `api/[...path].js`. |
 
 ## Customer / team help
 
