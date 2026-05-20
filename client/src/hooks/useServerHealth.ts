@@ -17,6 +17,7 @@ export function useServerHealth() {
   const [version, setVersion] = useState<string | null>(null)
   const [credentialStore, setCredentialStore] = useState<CredentialStore>('demo')
   const [auth, setAuth] = useState<HealthAuth | null>(null)
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null)
 
   useEffect(() => {
     let c = false
@@ -24,6 +25,7 @@ export function useServerHealth() {
       try {
         const h = await apiFetch<{ version?: string; auth?: HealthAuth }>('/api/health', {})
         if (c) return
+        setApiOnline(true)
         if (typeof h.version === 'string' && h.version.length) setVersion(h.version)
         setAuth(h.auth ?? null)
         const cs = h.auth?.credentialStore
@@ -32,6 +34,7 @@ export function useServerHealth() {
         else setCredentialStore('demo')
       } catch {
         if (!c) {
+          setApiOnline(false)
           setVersion(null)
           setAuth(null)
           setCredentialStore('demo')
@@ -43,5 +46,5 @@ export function useServerHealth() {
     }
   }, [])
 
-  return { version, credentialStore, auth }
+  return { version, credentialStore, auth, apiOnline }
 }

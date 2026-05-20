@@ -15,7 +15,7 @@ const DEMO_ROLES: { username: string; role: Role; label: string; hint: string }[
 
 export function Login() {
   const { token, setSession } = useAuth()
-  const { version: serverVersion, credentialStore } = useServerHealth()
+  const { version: serverVersion, credentialStore, apiOnline } = useServerHealth()
   const nav = useNavigate()
   const loc = useLocation()
   const [username, setUsername] = useState('lead')
@@ -120,13 +120,35 @@ export function Login() {
         setStep('mfa')
         return
       }
-      if (!res.token) throw new Error('Sign-in failed.')
+      if (res.mfaRequired) {
+        throw new Error('Two-factor sign-in is required but the server response was incomplete. Try again or contact your administrator.')
+      }
+      if (res.enrollmentRequired) {
+        throw new Error('MFA enrollment is required but the server response was incomplete. Try again or contact your administrator.')
+      }
+      if (!res.token) {
+        throw new Error(
+          credentialStore === 'sqlite'
+            ? 'Sign-in failed. This server uses SQLite accounts — use the password set by your administrator (not demo), or ask the lead to reset your account.'
+            : 'Sign-in failed. The API responded without a session — is the command centre API running and reachable?'
+        )
+      }
       setSession(res.token, res.user)
       nav('/')
     } catch (e) {
       const msg = (e as Error).message
-      if (/too many/i.test(msg)) {
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        setErr(
+          'Cannot reach the command centre API. Start it with npm run dev (local) or set VITE_API_URL to your hosted API (Vercel/production).'
+        )
+      } else if (/too many/i.test(msg)) {
         setErr('Too many failed attempts from this address. Please wait about fifteen minutes, then try again.')
+      } else if (/invalid credentials/i.test(msg)) {
+        setErr(
+          credentialStore === 'sqlite'
+            ? 'Invalid username or password. Demo password demo only works in demo mode — this server uses SQLite accounts.'
+            : msg
+        )
       } else {
         setErr(msg || 'Sign-in failed.')
       }
@@ -174,7 +196,17 @@ export function Login() {
           </div>
         ) : null}
 
-        {credentialStore === 'demo' ? (
+        {apiOnline === false ? (
+          <div role="alert" className="mt-6 rounded-md border border-fo-red/40 bg-fo-red/10 px-3 py-2 text-sm text-fo-red leading-relaxed">
+            <strong className="text-fo-red">API offline.</strong> The sign-in page cannot reach{' '}
+            <code className="text-fo-red/90">/api/health</code>. Run{' '}
+            <code className="text-fo-red/90">npm run dev</code> from the project folder (starts API on port 8787 and UI on
+            5173), or configure <code className="text-fo-red/90">VITE_API_URL</code> if you deployed the UI only (e.g.
+            Vercel).
+          </div>
+        ) : null}
+
+        {credentialStore === 'demo' && apiOnline !== false ? (
           <div className="mt-8">
             <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Quick sign-in (demo)</div>
             <div className="flex flex-wrap gap-2">
@@ -200,7 +232,7 @@ export function Login() {
               ))}
             </div>
           </div>
-        ) : (
+        ) : apiOnline !== false ? (
           <p className="mt-8 text-xs text-zinc-500 leading-relaxed">
             This server uses{' '}
             <strong className="text-zinc-400">
@@ -208,7 +240,7 @@ export function Login() {
             </strong>
             . Enter the username and password issued by your administrator (demo quick-picks are hidden).
           </p>
-        )}
+        ) : null}
 
         {recoveryCodes ? (
           <div className="mt-8 space-y-4">
