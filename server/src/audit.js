@@ -15,3 +15,11 @@ export function logAudit(database, { actor, action, entityType = null, entityId 
     console.warn('[audit] log failed:', e.message);
   }
 }
+
+/** Optional human context from operators (e.g. lead explaining an access change). Max 500 chars, single-line. */
+export function sanitizeAuditNote(note) {
+  if (note == null) return undefined;
+  if (typeof note !== 'string') return undefined;
+  const s = note.trim().replace(/\s+/g, ' ').slice(0, 500);
+  return s.length ? s : undefined;
+}

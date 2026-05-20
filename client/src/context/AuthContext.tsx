@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { apiFetch, COOKIE_SESSION_SENTINEL, USE_SESSION_COOKIE } from '../lib/api'
 
 export type Role = 'chairman' | 'lead' | 'analyst' | 'viewer'
 
@@ -41,17 +42,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => readUser())
 
   const setSession = useCallback((t: string, u: User) => {
+    const storeToken = USE_SESSION_COOKIE ? COOKIE_SESSION_SENTINEL : t
     try {
-      localStorage.setItem(STORAGE_KEY, t)
+      localStorage.setItem(STORAGE_KEY, storeToken)
       localStorage.setItem(STORAGE_USER, JSON.stringify(u))
     } catch {
       /* private mode / quota */
     }
-    setToken(t)
+    setToken(storeToken)
     setUser(u)
   }, [])
 
   const logout = useCallback(() => {
+    const had = readStorage(STORAGE_KEY)
     try {
       localStorage.removeItem(STORAGE_KEY)
       localStorage.removeItem(STORAGE_USER)
@@ -60,6 +63,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setToken(null)
     setUser(null)
+    if (had) {
+      void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    }
   }, [])
 
   const canWrite = useMemo(() => user?.role === 'lead' || user?.role === 'analyst', [user])

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth } from '../context/AuthContext'
@@ -22,6 +23,8 @@ type Decision = {
 
 export function DecisionCentre() {
   const { token, canWrite } = useAuth()
+  const [searchParams] = useSearchParams()
+  const focusId = (searchParams.get('focus') || '').trim() || null
   const [items, setItems] = useState<Decision[]>([])
   const [showResolved, setShowResolved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -50,6 +53,19 @@ export function DecisionCentre() {
       c = true
     }
   }, [load])
+
+  useEffect(() => {
+    if (!focusId || loading) return
+    const esc = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(focusId) : focusId
+    const el = document.querySelector(`[data-decision-id="${esc}"]`)
+    if (!el || !(el instanceof HTMLElement)) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    el.classList.add('ring-2', 'ring-fo-gold/50', 'bg-fo-gold/5')
+    const t = window.setTimeout(() => {
+      el.classList.remove('ring-2', 'ring-fo-gold/50', 'bg-fo-gold/5')
+    }, 2600)
+    return () => window.clearTimeout(t)
+  }, [focusId, loading, items])
 
   async function resolve(id: string) {
     setBusyId(id)
@@ -104,7 +120,8 @@ export function DecisionCentre() {
         {visible.map((d) => (
           <div
             key={d.id}
-            className={`rounded-2xl border border-fo-border p-4 md:p-5 bg-fo-graphite/40 ${
+            data-decision-id={d.id}
+            className={`rounded-2xl border border-fo-border p-4 md:p-5 bg-fo-graphite/40 scroll-mt-4 ${
               d.status === 'resolved' ? 'opacity-70 border-zinc-700' : ''
             }`}
           >

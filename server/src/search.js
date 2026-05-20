@@ -1,7 +1,8 @@
+import { isOutstandingDocumentRow } from './documentFilters.js';
+
 const SECTION_LIMIT = 24;
 
-/**
- * Cross-register search (Master, Cash, Real Estate, Documents, Liabilities).
+/** * Cross-register search (Master, Cash, Real Estate, Documents, Liabilities).
  * @param {import('better-sqlite3').Database} database
  * @param {string} rawQuery
  */
@@ -57,7 +58,7 @@ export function globalSearch(database, rawQuery) {
     )
     .all(pattern, pattern, pattern, pattern, SECTION_LIMIT);
 
-  const documents = database
+  const documentRows = database
     .prepare(
       `SELECT id, document_id, document_category, entity_asset, status, owner
        FROM documents
@@ -65,9 +66,20 @@ export function globalSearch(database, rawQuery) {
           OR lower(ifnull(entity_asset,'')) LIKE ?
           OR lower(ifnull(document_id,'')) LIKE ?
           OR lower(ifnull(owner,'')) LIKE ?
+          OR lower(ifnull(status,'')) LIKE ?
        LIMIT ?`
     )
-    .all(pattern, pattern, pattern, pattern, SECTION_LIMIT);
+    .all(pattern, pattern, pattern, pattern, pattern, SECTION_LIMIT);
+
+  const documents = documentRows.map((row) => ({
+    id: row.id,
+    document_id: row.document_id,
+    document_category: row.document_category,
+    entity_asset: row.entity_asset,
+    status: row.status,
+    owner: row.owner,
+    outstandingInTracker: isOutstandingDocumentRow(row)
+  }));
 
   const liabilities = database
     .prepare(

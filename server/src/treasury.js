@@ -19,6 +19,25 @@ function cashTreasuryTracked(c) {
   );
 }
 
+/** Best-effort deep link for a cash row (aligns with decision ids like DEC-REC-<account_id>). */
+function treasuryRowCta(c, flags) {
+  const aid = String(c.account_id || '').trim();
+  if (flags.reconciliationStale && flags.tracked && aid) {
+    return `/decisions?focus=${encodeURIComponent(`DEC-REC-${aid}`)}`;
+  }
+  if (flags.belowMinimum && aid) {
+    return '/risk';
+  }
+  if (aid) {
+    return `/search?q=${encodeURIComponent(aid)}`;
+  }
+  const bank = String(c.bank_name || '').trim().slice(0, 120);
+  if (bank) {
+    return `/search?q=${encodeURIComponent(bank)}`;
+  }
+  return '/treasury';
+}
+
 /**
  * Cash & banking intelligence aligned to workbook + risk engine rules.
  * @param {import('better-sqlite3').Database} database
@@ -66,7 +85,13 @@ export function getTreasuryOverview(database) {
         belowMinimum,
         reconciliationStale,
         reconciliationDaysSince
-      }
+      },
+      ctaTo: treasuryRowCta(c, {
+        tracked,
+        belowMinimum,
+        reconciliationStale,
+        reconciliationDaysSince
+      })
     };
   });
 

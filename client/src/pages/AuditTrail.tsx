@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { PaginationBar } from '../components/ui/PaginationBar'
+import { TableScroll } from '../components/ui/TableScroll'
 import { useAuth } from '../context/AuthContext'
 import { useNotify } from '../context/NotificationContext'
 import { apiFetch } from '../lib/api'
@@ -18,6 +20,54 @@ type AuditRow = {
 }
 
 const PAGE_SIZE = 40
+
+function AuditMetaDetail({ meta }: { meta: Record<string, unknown> | null }) {
+  if (!meta) return <>—</>
+  const rawNote = meta.note
+  const note = typeof rawNote === 'string' && rawNote.trim() ? rawNote.trim() : null
+  const { note: _omit, ...rest } = meta
+  const hasRest = Object.keys(rest).length > 0
+  return (
+    <div className="max-w-md">
+      {note ? (
+        <div className="mb-1 text-[11px] font-sans text-zinc-300 leading-snug whitespace-normal">
+          <span className="text-[9px] uppercase tracking-wide text-zinc-500">Note </span>
+          {note}
+        </div>
+      ) : null}
+      {hasRest ? (
+        <div className="truncate font-mono text-[10px] text-zinc-500" title={JSON.stringify(rest)}>
+          {JSON.stringify(rest)}
+        </div>
+      ) : !note ? (
+        '—'
+      ) : null}
+    </div>
+  )
+}
+
+/** Optional screen to open for common audit actions (best-effort). */
+function auditEventRelatedRoute(row: AuditRow): string | null {
+  const act = (row.action || '').toLowerCase()
+  const et = (row.entity_type || '').toLowerCase()
+  if (act.startsWith('import.')) return '/import'
+  if (act.startsWith('auth.')) return '/settings'
+  if (act.startsWith('admin.')) return '/admin/users'
+  if (act.startsWith('decision.')) return '/decisions'
+  if (act.startsWith('snapshot.')) return '/snapshots'
+  if (act.startsWith('documents.review')) return '/documents'
+  if (act.startsWith('data.')) {
+    if (et === 'master_assets') return '/data/master'
+    if (et === 'documents') return '/documents'
+    if (et === 'cash_banking') return '/treasury'
+    if (et === 'liabilities') return '/risk'
+    return null
+  }
+  if (et === 'app_user') return '/admin/users'
+  if (et === 'user') return '/settings'
+  if (et === 'document' || act.includes('document')) return '/documents?outstanding=1'
+  return null
+}
 
 export function AuditTrail() {
   const { token } = useAuth()
@@ -73,7 +123,7 @@ export function AuditTrail() {
       <PageHeader
         eyebrow="Governance"
         title="Audit trail"
-        description={`Append-only log of material actions (newest first). This screen loads ${PAGE_SIZE} events per page; CSV export can include up to 2,000 rows.`}
+        description={`Append-only log of material actions (newest first). Team user changes may include an operator note plus before/after role and display name. The Related column links to the screen most often needed for that event (imports, account security, team users, compliance). This screen loads ${PAGE_SIZE} events per page; CSV export can include up to 2,000 rows.`}
         actions={
           <button
             type="button"
@@ -106,8 +156,8 @@ export function AuditTrail() {
       {loading ? <LoadingBlock label="Loading audit trail…" /> : null}
 
       {!loading && !err ? (
-        <div className="overflow-hidden rounded-2xl border border-fo-border">
-          <div className="max-h-[70vh] overflow-x-auto overflow-y-auto">
+        <div>
+          <TableScroll maxHeight="max-h-[70vh]">
             <table className="min-w-full text-xs md:text-sm">
               <thead className="sticky top-0 z-10 bg-fo-panel text-left text-[10px] uppercase tracking-wider text-zinc-400">
                 <tr>
@@ -126,10 +176,15 @@ export function AuditTrail() {
                   <th className="px-3 py-2" scope="col">
                     Detail
                   </th>
+                  <th className="px-3 py-2 text-right" scope="col">
+                    Related
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((a) => (
+                {items.map((a) => {
+                  const related = auditEventRelatedRoute(a)
+                  return (
                   <tr key={a.id} className="border-t border-fo-border hover:bg-fo-panel/30">
                     <td className="whitespace-nowrap px-3 py-2 text-zinc-500">{a.created_at}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-fo-gold-soft">{a.actor}</td>
@@ -138,17 +193,30 @@ export function AuditTrail() {
                       {a.entity_type || '—'}
                       {a.entity_id ? <span className="text-zinc-600"> · {a.entity_id}</span> : null}
                     </td>
-                    <td className="max-w-md truncate px-3 py-2 font-mono text-[10px] text-zinc-500">
-                      {a.meta ? JSON.stringify(a.meta) : '—'}
+                    <td className="max-w-md px-3 py-2 text-[10px] text-zinc-500">
+                      <AuditMetaDetail meta={a.meta} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      {related ? (
+                        <Link
+                          to={related}
+                          className="text-xs text-fo-gold-soft hover:text-fo-gold hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fo-gold/50 rounded-sm"
+                        >
+                          Open
+                        </Link>
+                      ) : (
+                        <span className="text-zinc-600">—</span>
+                      )}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             {!items.length ? (
               <div className="p-4 text-sm text-zinc-500">No audit events yet. Actions are logged from this release onward.</div>
             ) : null}
-          </div>
+          </TableScroll>
           <PaginationBar offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
         </div>
       ) : null}

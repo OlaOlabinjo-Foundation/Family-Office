@@ -150,8 +150,14 @@ export function importBuffer(buffer, options) {
   return { summary, entities };
 }
 
-export function logImport(filename, status, message, rows_summary) {
+/**
+ * @param {Record<string, unknown>} rows_summary
+ * @param {{ approvedBy?: string | null, effectiveDate?: string | null }} [meta]
+ */
+export function logImport(filename, status, message, rows_summary, meta = {}) {
+  const approvedBy = meta.approvedBy != null ? String(meta.approvedBy).trim().slice(0, 240) : null;
+  const effectiveDate = meta.effectiveDate != null ? String(meta.effectiveDate).trim().slice(0, 40) : null;
   db.prepare(
-    `INSERT INTO import_history (filename, status, message, rows_summary) VALUES (?, ?, ?, ?)`
-  ).run(filename, status, message, JSON.stringify(rows_summary));
+    `INSERT INTO import_history (filename, status, message, rows_summary, approved_by, effective_date) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(filename, status, message, JSON.stringify(rows_summary), approvedBy || null, effectiveDate || null);
 }

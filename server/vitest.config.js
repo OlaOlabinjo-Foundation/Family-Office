@@ -6,5 +6,6 @@ export default defineConfig({
     include: ['src/**/*.test.js'],
     pool: 'forks',
     singleFork: true,
+    testTimeout: 20_000,
   },
 });

@@ -1,19 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
+import { setDocumentTitle } from '../lib/documentTitle'
 
 type Heat = {
   levels: string[]
-  cells: { id: string; axisX: string; axisY: string; value: number; level: string }[]
+  cells: { id: string; axisX: string; axisY: string; value: number; level: string; ctaTo: string }[]
 }
 
 export function RiskModule() {
   const { token } = useAuth()
+  const [searchParams] = useSearchParams()
   const [data, setData] = useState<Heat | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const focusId = useMemo(() => (searchParams.get('focus') || '').trim() || null, [searchParams])
+
+  useEffect(() => {
+    setDocumentTitle('Risk intelligence')
+  }, [])
 
   useEffect(() => {
     let c = false
@@ -34,12 +43,28 @@ export function RiskModule() {
     }
   }, [token])
 
+  useEffect(() => {
+    if (!focusId || loading || !data?.cells.length) return
+    const esc = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(focusId) : focusId
+    const el = document.querySelector(`[data-risk-cell="${esc}"]`)
+    if (!el || !(el instanceof HTMLElement)) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    el.classList.add('ring-2', 'ring-fo-gold/50', 'bg-fo-gold/5')
+    const t = window.setTimeout(() => {
+      el.classList.remove('ring-2', 'ring-fo-gold/50', 'bg-fo-gold/5')
+    }, 2600)
+    return () => window.clearTimeout(t)
+  }, [focusId, loading, data])
+
+  const focusOnPage =
+    focusId != null && Boolean(data?.cells.some((c) => c.id === focusId))
+
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Controls"
         title="Risk intelligence"
-        description="Heat map derived from workbook rules: concentration, liquidity, valuation ageing, reconciliations, debt maturity, and documentation gaps."
+        description="Heat map derived from workbook rules: concentration, liquidity, valuation ageing, reconciliations, debt maturity, and documentation gaps. Each cell links to the screen where you can review or remediate the signal. Deep-link a cell by adding ?focus= and the heat-map cell id to the URL (same pattern as Decisions and Next actions)."
       />
 
       {err ? (
@@ -48,6 +73,16 @@ export function RiskModule() {
         </div>
       ) : null}
       {loading ? <LoadingBlock label="Loading risk intelligence…" /> : null}
+
+      {!loading && !err && focusId != null && data && data.cells.length > 0 && !focusOnPage ? (
+        <div role="status" className="rounded-lg border border-fo-amber/30 bg-fo-amber/5 px-4 py-3 text-sm text-zinc-300">
+          No heat cell matches id <span className="font-mono text-fo-gold-soft">{focusId}</span>. The map may have changed after import —{' '}
+          <Link to="/risk" className="text-fo-gold-soft hover:underline">
+            clear focus from the URL
+          </Link>{' '}
+          or open the related view from the dashboard risk list.
+        </div>
+      ) : null}
 
       {!loading && data ? (
         <>
@@ -80,6 +115,7 @@ export function RiskModule() {
             {data.cells.map((cell) => (
               <div
                 key={cell.id}
+                data-risk-cell={cell.id}
                 role="group"
                 tabIndex={0}
                 aria-label={`${cell.axisY}. ${cell.axisX}. Severity index ${cell.value}. Level ${cell.level}.`}
@@ -97,6 +133,12 @@ export function RiskModule() {
                 <div className="mt-1 text-sm leading-snug text-white">{cell.axisY}</div>
                 <div className="mt-2 text-[11px] text-zinc-400">Severity index: {cell.value}</div>
                 <div className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600">Level: {cell.level}</div>
+                <Link
+                  to={cell.ctaTo}
+                  className="mt-3 inline-flex text-xs font-medium uppercase tracking-wider text-fo-gold-soft hover:text-fo-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fo-gold/50 rounded-sm"
+                >
+                  Open related view<span className="ml-1" aria-hidden>→</span>
+                </Link>
               </div>
             ))}
           </div>

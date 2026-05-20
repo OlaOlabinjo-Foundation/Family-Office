@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import type { Role } from '../context/AuthContext'
-import { useServerVersion } from '../hooks/useServerVersion'
+import { useServerHealth } from '../hooks/useServerHealth'
 import { apiFetch } from '../lib/api'
 import { setDocumentTitle } from '../lib/documentTitle'
 
@@ -15,11 +15,20 @@ const DEMO_ROLES: { username: string; role: Role; label: string; hint: string }[
 
 export function Login() {
   const { token, setSession } = useAuth()
-  const serverVersion = useServerVersion()
+  const { version: serverVersion, credentialStore } = useServerHealth()
   const nav = useNavigate()
   const loc = useLocation()
   const [username, setUsername] = useState('lead')
   const [password, setPassword] = useState('demo')
+  const [step, setStep] = useState<'password' | 'mfa' | 'enroll'>('password')
+  const [mfaToken, setMfaToken] = useState<string | null>(null)
+  const [enrollmentToken, setEnrollmentToken] = useState<string | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
+  const [enrollCode, setEnrollCode] = useState('')
+  const [enrollQr, setEnrollQr] = useState<string | null>(null)
+  const [enrollSecret, setEnrollSecret] = useState<string | null>(null)
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
+  const [mfaUserLabel, setMfaUserLabel] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -28,6 +37,32 @@ export function Login() {
     setDocumentTitle('Sign in')
   }, [token])
 
+  useEffect(() => {
+    if (step !== 'enroll' || !enrollmentToken || enrollQr) return
+    let c = false
+    ;(async () => {
+      setLoading(true)
+      setErr(null)
+      try {
+        const r = await apiFetch<{ qrUrl: string; secret: string }>('/api/auth/mfa/enrollment/setup', {
+          method: 'POST',
+          body: JSON.stringify({ enrollmentToken }),
+        })
+        if (!c) {
+          setEnrollQr(r.qrUrl)
+          setEnrollSecret(r.secret)
+        }
+      } catch (e) {
+        if (!c) setErr((e as Error).message)
+      } finally {
+        if (!c) setLoading(false)
+      }
+    })()
+    return () => {
+      c = true
+    }
+  }, [step, enrollmentToken, enrollQr])
+
   if (token) return <Navigate to="/" replace />
 
   async function onSubmit(e: React.FormEvent) {
@@ -35,10 +70,57 @@ export function Login() {
     setErr(null)
     setLoading(true)
     try {
+      if (step === 'enroll' && enrollmentToken) {
+        const res = await apiFetch<{
+          token: string
+          user: { username: string; role: Role; displayName: string }
+          recoveryCodes: string[]
+        }>('/api/auth/mfa/enrollment/enable', {
+          method: 'POST',
+          body: JSON.stringify({ enrollmentToken, code: enrollCode }),
+        })
+        setRecoveryCodes(res.recoveryCodes)
+        setSession(res.token, res.user)
+        return
+      }
+      if (step === 'mfa' && mfaToken) {
+        const res = await apiFetch<{
+          token: string
+          user: { username: string; role: Role; displayName: string }
+        }>('/api/auth/mfa/verify', {
+          method: 'POST',
+          body: JSON.stringify({ mfaToken, code: mfaCode }),
+        })
+        setSession(res.token, res.user)
+        nav('/')
+        return
+      }
       const res = await apiFetch<{
-        token: string
+        token?: string
+        mfaRequired?: boolean
+        mfaToken?: string
+        enrollmentRequired?: boolean
+        enrollmentToken?: string
         user: { username: string; role: Role; displayName: string }
       }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+      if (res.enrollmentRequired && res.enrollmentToken) {
+        setEnrollmentToken(res.enrollmentToken)
+        setMfaUserLabel(res.user.displayName || res.user.username)
+        setEnrollCode('')
+        setEnrollQr(null)
+        setEnrollSecret(null)
+        setRecoveryCodes(null)
+        setStep('enroll')
+        return
+      }
+      if (res.mfaRequired && res.mfaToken) {
+        setMfaToken(res.mfaToken)
+        setMfaUserLabel(res.user.displayName || res.user.username)
+        setMfaCode('')
+        setStep('mfa')
+        return
+      }
+      if (!res.token) throw new Error('Sign-in failed.')
       setSession(res.token, res.user)
       nav('/')
     } catch (e) {
@@ -53,8 +135,25 @@ export function Login() {
     }
   }
 
+  function backToPassword() {
+    setStep('password')
+    setMfaToken(null)
+    setEnrollmentToken(null)
+    setMfaCode('')
+    setEnrollCode('')
+    setEnrollQr(null)
+    setEnrollSecret(null)
+    setRecoveryCodes(null)
+    setMfaUserLabel(null)
+    setErr(null)
+  }
+
+  function continueAfterEnrollment() {
+    nav('/')
+  }
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-fo-black flex items-center justify-center px-4 py-12">
+    <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-fo-black flex items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))]">
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
@@ -75,32 +174,123 @@ export function Login() {
           </div>
         ) : null}
 
-        <div className="mt-8">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Quick sign-in (demo)</div>
-          <div className="flex flex-wrap gap-2">
-            {DEMO_ROLES.map((r) => (
-              <button
-                key={r.username}
-                type="button"
-                onClick={() => {
-                  setUsername(r.username)
-                  setErr(null)
-                }}
-                className={`rounded-full border px-3 py-1.5 text-xs transition-colors focus-ring-inset ${
-                  username === r.username
-                    ? 'border-fo-gold bg-fo-panel text-fo-gold-soft'
-                    : 'border-fo-border text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
-                }`}
-                aria-pressed={username === r.username}
-              >
-                {r.label}
-                <span className="ml-1 text-[10px] text-zinc-600">· {r.hint}</span>
-              </button>
-            ))}
+        {credentialStore === 'demo' ? (
+          <div className="mt-8">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Quick sign-in (demo)</div>
+            <div className="flex flex-wrap gap-2">
+              {DEMO_ROLES.map((r) => (
+                <button
+                  key={r.username}
+                  type="button"
+                  onClick={() => {
+                    setUsername(r.username)
+                    setPassword('demo')
+                    setErr(null)
+                  }}
+                  className={`btn-touch rounded-full border px-3 text-xs transition-colors focus-ring-inset ${
+                    username === r.username
+                      ? 'border-fo-gold bg-fo-panel text-fo-gold-soft'
+                      : 'border-fo-border text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+                  }`}
+                  aria-pressed={username === r.username}
+                >
+                  {r.label}
+                  <span className="ml-1 text-[10px] text-zinc-600">· {r.hint}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="mt-8 text-xs text-zinc-500 leading-relaxed">
+            This server uses{' '}
+            <strong className="text-zinc-400">
+              {credentialStore === 'sqlite' ? 'SQLite-stored accounts' : 'environment-configured accounts'}
+            </strong>
+            . Enter the username and password issued by your administrator (demo quick-picks are hidden).
+          </p>
+        )}
 
+        {recoveryCodes ? (
+          <div className="mt-8 space-y-4">
+            <p className="text-sm text-fo-amber">Save these recovery codes — each works once if you lose your phone.</p>
+            <ul className="grid grid-cols-2 gap-2 font-mono text-sm text-zinc-200">
+              {recoveryCodes.map((c) => (
+                <li key={c} className="rounded bg-fo-panel px-2 py-1">
+                  {c}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={continueAfterEnrollment}
+              className="btn-touch w-full rounded-md bg-fo-gold text-sm font-semibold text-fo-black"
+            >
+              Continue to command centre
+            </button>
+          </div>
+        ) : (
         <form onSubmit={onSubmit} className="mt-8 space-y-5" noValidate>
+          {step === 'enroll' ? (
+            <>
+              <p className="text-sm text-zinc-400">
+                <span className="text-white">{mfaUserLabel}</span> — set up two-factor authentication before you can use the
+                portal.
+              </p>
+              {enrollQr ? (
+                <img src={enrollQr} alt="Authenticator QR" className="mx-auto rounded border border-fo-border bg-white p-2 w-[180px]" />
+              ) : null}
+              {enrollSecret ? (
+                <p className="text-xs text-zinc-500 break-all font-mono text-center">{enrollSecret}</p>
+              ) : null}
+              <div>
+                <label htmlFor="login-enroll-code" className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  6-digit code from app
+                </label>
+                <input
+                  id="login-enroll-code"
+                  inputMode="numeric"
+                  value={enrollCode}
+                  onChange={(e) => setEnrollCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  disabled={loading}
+                  className="w-full rounded-md border border-fo-border bg-fo-panel px-3 py-2.5 text-sm text-white tracking-widest outline-none focus:border-fo-gold"
+                />
+              </div>
+              <button type="button" onClick={backToPassword} className="text-xs text-zinc-500 hover:text-zinc-300">
+                ← Use a different account
+              </button>
+            </>
+          ) : step === 'mfa' ? (
+            <>
+              <p className="text-sm text-zinc-400">
+                Two-factor sign-in for <span className="text-white">{mfaUserLabel}</span>. Enter the 6-digit code from your
+                authenticator app, or a recovery code.
+              </p>
+              <div>
+                <label htmlFor="login-mfa-code" className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Authenticator code
+                </label>
+                <input
+                  id="login-mfa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="w-full rounded-md border border-fo-border bg-fo-panel px-3 py-2.5 text-sm text-white tracking-widest outline-none focus:border-fo-gold"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\s/g, '').slice(0, 12))}
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+              <button
+                type="button"
+                onClick={backToPassword}
+                disabled={loading}
+                className="text-xs text-zinc-500 hover:text-zinc-300"
+              >
+                ← Use a different account
+              </button>
+            </>
+          ) : (
+            <>
           <div>
             <label htmlFor="login-username" className="mb-1.5 block text-xs font-medium text-zinc-400">
               Username
@@ -130,6 +320,8 @@ export function Login() {
               disabled={loading}
             />
           </div>
+            </>
+          )}
           {err ? (
             <div role="alert" className="rounded-md border border-fo-red/40 bg-fo-red/10 px-3 py-2 text-sm text-fo-red">
               {err}
@@ -137,22 +329,37 @@ export function Login() {
           ) : null}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-fo-gold py-3 text-sm font-semibold text-fo-black transition-colors hover:bg-fo-gold-soft disabled:cursor-not-allowed disabled:opacity-50 focus-ring-inset"
+            disabled={
+              loading ||
+              (step === 'mfa' && mfaCode.length < 6) ||
+              (step === 'enroll' && enrollCode.length !== 6)
+            }
+            className="btn-touch w-full rounded-md bg-fo-gold text-sm font-semibold text-fo-black transition-colors hover:bg-fo-gold-soft disabled:cursor-not-allowed disabled:opacity-50 focus-ring-inset"
           >
-            {loading ? 'Signing in…' : 'Enter command centre'}
+            {loading
+              ? 'Signing in…'
+              : step === 'enroll'
+                ? 'Enable MFA and sign in'
+                : step === 'mfa'
+                  ? 'Verify and enter'
+                  : 'Enter command centre'}
           </button>
         </form>
+        )}
 
         <p className="mt-8 border-t border-fo-border pt-6 text-center text-[11px] leading-relaxed text-zinc-500">
-          All demo accounts use password <span className="font-mono text-fo-gold-soft">demo</span>. This is mock authentication for
-          development only — do not use for real data.
-          {serverVersion ? (
+          {credentialStore === 'demo' ? (
             <>
-              {' '}
-              <span className="text-zinc-600">API release {serverVersion}.</span>
+              Demo accounts use password <span className="font-mono text-fo-gold-soft">demo</span>. For production use{' '}
+              <code className="text-zinc-600">FAMILY_OFFICE_AUTH=sqlite</code> (with seeded users) or{' '}
+              <code className="text-zinc-600">FAMILY_OFFICE_USERS_JSON</code>.
             </>
-          ) : null}
+          ) : credentialStore === 'sqlite' ? (
+            <>Passwords are stored as scrypt hashes in the SQLite database.</>
+          ) : (
+            <>Passwords are verified with scrypt hashes from the server environment configuration.</>
+          )}{' '}
+          {serverVersion ? <span className="text-zinc-600">API release {serverVersion}.</span> : null}
         </p>
       </div>
     </div>

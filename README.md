@@ -21,6 +21,18 @@ Do **not** run `npx serve .` from the repo root: there is no app `index.html` th
 | **Production-like** — one process | `npm start` | **http://localhost:8787** |
 | **Preview** — built assets + separate API | Terminal 1: `npm run dev -w server` · Terminal 2: `npm run preview` | **http://localhost:4173** |
 
+## Backups
+
+- **Before import:** the API writes `pre-import-*.sqlite` under `backups/` beside your database file.
+- **Scheduled full backup** (database + document vault):
+
+```bash
+npm run backup
+# or: FAMILY_OFFICE_SQLITE=server/data/family-office.sqlite npm run backup -w server
+```
+
+Copy the `backups/` folder off the server daily (cron example in `server/scripts/backup-full.mjs`).
+
 ## Production setup checklist
 
 1. Copy [`.env.example`](.env.example) and set secrets on the server process.
@@ -52,6 +64,10 @@ Do **not** run `npx serve .` from the repo root: there is no app `index.html` th
 | `FX_NGN_PER_USD` | NGN per 1 USD for dashboard indicative conversions (default `1600`). |
 | `FX_NGN_PER_GBP` | NGN per 1 GBP (default `2050`). |
 | `FX_NGN_PER_EUR` | NGN per 1 EUR (default `1750`). |
+| `FAMILY_OFFICE_CORS_ORIGINS` | Comma-separated allowed browser origins in production (e.g. `https://portal.example.com`). |
+| `FAMILY_OFFICE_SESSION_COOKIE` | Set to `1` for httpOnly session cookies (pair with `VITE_SESSION_COOKIE=1` on client build). |
+
+**Production hardening:** with `NODE_ENV=production`, the API refuses to start if demo auth is active or `JWT_SECRET` is missing (&lt; 32 chars). Login routes are rate-limited and `helmet` is enabled.
 
 ### SQLite account store (`FAMILY_OFFICE_AUTH=sqlite`)
 
@@ -104,6 +120,7 @@ Roles: `chairman`, `lead`, `analyst`, `viewer`.
 |----------|---------|
 | `VITE_API_URL` | Base URL for API (empty = same origin). |
 | `VITE_HELP_CENTER_URL` | Optional link shown on **Help** as “Customer hub” (Notion / Google Doc). |
+| `VITE_SESSION_COOKIE` | Set to `1` when API uses `FAMILY_OFFICE_SESSION_COOKIE=1` (httpOnly cookie sessions). |
 
 ## Customer / team help
 

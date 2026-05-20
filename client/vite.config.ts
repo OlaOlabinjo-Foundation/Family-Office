@@ -14,4 +14,15 @@ export default defineConfig({
       },
     },
   },
+  /** `vite preview` — same API proxy as dev (start server on 8787 first). */
+  preview: {
+    port: 4173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
+    },
+  },
 })

@@ -28,7 +28,13 @@ type SearchPayload = {
     current_value: number | null
     currency: string
   }[]
-  documents: { id: number; document_category: string; entity_asset: string; status: string }[]
+  documents: {
+    id: number
+    document_category: string
+    entity_asset: string
+    status: string
+    outstandingInTracker: boolean
+  }[]
   liabilities: {
     id: number
     lender: string
@@ -106,46 +112,67 @@ export function SearchPage() {
 
           <Section title="Master assets" empty={!data.master_assets.length}>
             <ul className="space-y-2">
-              {data.master_assets.map((a) => (
-                <li key={a.id} className="border border-fo-border rounded-lg p-3 text-sm hover:bg-fo-panel/50">
-                  <Link to="/data/master" className="text-fo-gold-soft font-medium">
-                    {a.asset_id}
-                  </Link>
-                  <span className="text-white"> · {a.asset_name}</span>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    {a.asset_category} · {a.jurisdiction}
-                  </div>
-                </li>
-              ))}
+              {data.master_assets.map((a) => {
+                const aid = String(a.asset_id || '').trim()
+                return (
+                  <li key={a.id} className="border border-fo-border rounded-lg p-3 text-sm hover:bg-fo-panel/50">
+                    <Link
+                      to={aid ? `/data/master?highlight=${encodeURIComponent(aid)}` : '/data/master'}
+                      className="text-fo-gold-soft font-medium"
+                    >
+                      {a.asset_id}
+                    </Link>
+                    <span className="text-white"> · {a.asset_name}</span>
+                    <div className="text-xs text-zinc-500 mt-1">
+                      {a.asset_category} · {a.jurisdiction}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </Section>
 
           <Section title="Cash & banking" empty={!data.cash_banking.length}>
             <ul className="space-y-2">
-              {data.cash_banking.map((c) => (
-                <li key={c.id} className="border border-fo-border rounded-lg p-3 text-sm">
-                  <Link to="/treasury" className="text-fo-gold-soft">
-                    {c.bank_name || 'Bank'}
-                  </Link>
-                  <span className="text-zinc-300"> · {c.account_name || c.account_id}</span>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    {c.owner_entity} · {formatCompactNgn(c.current_balance)} {c.currency}
-                  </div>
-                </li>
-              ))}
+              {data.cash_banking.map((c) => {
+                const acct = String(c.account_id || '').trim()
+                return (
+                  <li key={c.id} className="border border-fo-border rounded-lg p-3 text-sm">
+                    <Link
+                      to={acct ? `/treasury?highlight=${encodeURIComponent(acct)}` : '/treasury'}
+                      className="text-fo-gold-soft"
+                    >
+                      {c.bank_name || 'Bank'}
+                    </Link>
+                    <span className="text-zinc-300"> · {c.account_name || c.account_id}</span>
+                    <div className="text-xs text-zinc-500 mt-1">
+                      {c.owner_entity} · {formatCompactNgn(c.current_balance)} {c.currency}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </Section>
 
           <Section title="Real estate" empty={!data.real_estate.length}>
             <ul className="space-y-2">
-              {data.real_estate.map((r) => (
-                <li key={r.id} className="border border-fo-border rounded-lg p-3 text-sm">
-                  <span className="text-white">{r.name_address}</span>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    {r.property_id} · {r.country} · {formatCompactNgn(r.current_value)} {r.currency}
-                  </div>
-                </li>
-              ))}
+              {data.real_estate.map((r) => {
+                const q = (r.name_address || r.property_id || '').trim().slice(0, 240)
+                return (
+                  <li key={r.id} className="border border-fo-border rounded-lg p-3 text-sm">
+                    {q ? (
+                      <Link to={`/search?q=${encodeURIComponent(q)}`} className="text-white hover:text-fo-gold-soft font-medium">
+                        {r.name_address || r.property_id || 'Property'}
+                      </Link>
+                    ) : (
+                      <span className="text-white">Property</span>
+                    )}
+                    <div className="text-xs text-zinc-500 mt-1">
+                      {r.property_id} · {r.country} · {formatCompactNgn(r.current_value)} {r.currency}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </Section>
 
@@ -153,10 +180,25 @@ export function SearchPage() {
             <ul className="space-y-2">
               {data.documents.map((d) => (
                 <li key={d.id} className="border border-fo-border rounded-lg p-3 text-sm">
-                  <Link to="/documents" className="text-fo-gold-soft">
-                    {d.document_category || 'Document'}
-                  </Link>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <Link
+                      to={
+                        d.outstandingInTracker
+                          ? `/documents?outstanding=1&highlight=${d.id}`
+                          : `/documents?highlight=${d.id}`
+                      }
+                      className="text-fo-gold-soft font-medium"
+                    >
+                      {d.document_category || 'Document'}
+                    </Link>
+                    {d.outstandingInTracker ? (
+                      <span className="text-[10px] uppercase tracking-wider text-fo-amber">Outstanding</span>
+                    ) : null}
+                  </div>
                   <div className="text-xs text-zinc-500 mt-1">{d.entity_asset}</div>
+                  {d.status ? (
+                    <div className="text-[11px] text-zinc-600 mt-1">Status: {d.status}</div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -164,14 +206,23 @@ export function SearchPage() {
 
           <Section title="Liabilities" empty={!data.liabilities.length}>
             <ul className="space-y-2">
-              {data.liabilities.map((L) => (
-                <li key={L.id} className="border border-fo-border rounded-lg p-3 text-sm">
-                  <span className="text-white">{L.facility_type || 'Facility'}</span>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    {L.lender} · {L.borrower_entity} · {formatCompactNgn(L.outstanding_balance)} {L.currency}
-                  </div>
-                </li>
-              ))}
+              {data.liabilities.map((L) => {
+                const q = (L.lender || L.facility_type || L.borrower_entity || '').trim().slice(0, 240)
+                return (
+                  <li key={L.id} className="border border-fo-border rounded-lg p-3 text-sm">
+                    {q ? (
+                      <Link to={`/search?q=${encodeURIComponent(q)}`} className="text-white hover:text-fo-gold-soft font-medium">
+                        {L.facility_type || 'Facility'}
+                      </Link>
+                    ) : (
+                      <span className="text-white">{L.facility_type || 'Facility'}</span>
+                    )}
+                    <div className="text-xs text-zinc-500 mt-1">
+                      {L.lender} · {L.borrower_entity} · {formatCompactNgn(L.outstanding_balance)} {L.currency}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </Section>
         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts'
+import { ChairmanAssetsView } from '../components/chairman/ChairmanAssetsView'
 import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth } from '../context/AuthContext'
@@ -31,6 +32,12 @@ function exposureBucket(r: MasterRow & { country?: string | null }) {
 }
 
 export function AssetIntelligence() {
+  const { user } = useAuth()
+  if (user?.role === 'chairman') return <ChairmanAssetsView />
+  return <AssetIntelligenceOperator />
+}
+
+function AssetIntelligenceOperator() {
   const { token } = useAuth()
   const [searchParams] = useSearchParams()
   const [summary, setSummary] = useState<Summary | null>(null)

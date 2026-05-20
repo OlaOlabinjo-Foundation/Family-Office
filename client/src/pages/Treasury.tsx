@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ChairmanTreasuryView } from '../components/chairman/ChairmanTreasuryView'
 import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
+import { TableScroll } from '../components/ui/TableScroll'
 import { useAuth } from '../context/AuthContext'
 import { useNotify } from '../context/NotificationContext'
 import { apiFetch } from '../lib/api'
@@ -10,6 +12,7 @@ import { formatCompactNgn } from '../lib/format'
 
 type CashRow = Record<string, unknown> & {
   id: number
+  ctaTo: string
   flags: {
     tracked: boolean
     belowMinimum: boolean
@@ -31,8 +34,16 @@ type TreasuryPayload = {
 }
 
 export function Treasury() {
+  const { user } = useAuth()
+  if (user?.role === 'chairman') return <ChairmanTreasuryView />
+  return <TreasuryOperator />
+}
+
+function TreasuryOperator() {
   const { token } = useAuth()
   const { show: notify } = useNotify()
+  const [searchParams] = useSearchParams()
+  const highlightAccount = useMemo(() => (searchParams.get('highlight') || '').trim(), [searchParams])
   const [data, setData] = useState<TreasuryPayload | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,6 +68,23 @@ export function Treasury() {
     }
   }, [token])
 
+  const highlightOnPage =
+    highlightAccount.length > 0 &&
+    (data?.items.some((row) => String(row.account_id || '').trim() === highlightAccount) ?? false)
+
+  useEffect(() => {
+    if (!highlightAccount || loading || !data?.items.length) return
+    const esc = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(highlightAccount) : highlightAccount
+    const el = document.querySelector(`[data-treasury-account="${esc}"]`)
+    if (!el || !(el instanceof HTMLElement)) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    el.classList.add('ring-2', 'ring-fo-gold/50', 'bg-fo-gold/5')
+    const t = window.setTimeout(() => {
+      el.classList.remove('ring-2', 'ring-fo-gold/50', 'bg-fo-gold/5')
+    }, 2600)
+    return () => window.clearTimeout(t)
+  }, [highlightAccount, loading, data?.items])
+
   const totals = data?.totals
 
   return (
@@ -64,9 +92,15 @@ export function Treasury() {
       <PageHeader
         eyebrow="Liquidity"
         title="Treasury & liquidity"
-        description="Consolidated view of Cash & Banking with policy flags: tracked vs template lines, balances below minimum, and reconciliation ageing (same 30-day control used in the risk engine)."
+        description="Consolidated view of Cash & Banking with policy flags: tracked vs template lines, balances below minimum, and reconciliation ageing (same 30-day control used in the risk engine). Account IDs link to search, decisions (stale reconcile), or risk (below minimum). Use ?highlight=<account id> to scroll to a row when it is in the table."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link
+              to="/data/cash"
+              className="rounded-lg border border-fo-border bg-fo-panel px-4 py-2 text-xs uppercase tracking-wider text-zinc-200 hover:border-fo-gold/50 hover:text-fo-gold focus-ring-inset"
+            >
+              Edit cash register
+            </Link>
             <button
               type="button"
               onClick={async () => {
@@ -114,6 +148,12 @@ export function Treasury() {
       ) : null}
       {loading ? <LoadingBlock label="Loading treasury view…" /> : null}
 
+      {!loading && data && totals && highlightAccount && !highlightOnPage && totals.accountRows > 0 ? (
+        <p className="rounded-lg border border-fo-amber/30 bg-fo-amber/5 px-4 py-2 text-xs text-fo-amber" role="status">
+          No cash row matches account &quot;{highlightAccount}&quot; on this page.
+        </p>
+      ) : null}
+
       {!loading && data && totals ? (
         <>
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -124,7 +164,7 @@ export function Treasury() {
         <Stat label="Reconcile &gt; 30d" value={String(totals.staleReconciliationCount)} warn={totals.staleReconciliationCount > 0} />
       </div>
 
-      <div className="rounded-2xl border border-fo-border overflow-x-auto">
+      <TableScroll>
         <table className="min-w-full text-xs md:text-sm">
           <thead className="bg-fo-panel text-left text-zinc-400 uppercase text-[10px] tracking-wider">
             <tr>
@@ -154,14 +194,23 @@ export function Treasury() {
           <tbody>
             {data.items.map((row) => {
               const f = row.flags
+              const acct = String(row.account_id || '').trim()
               return (
                 <tr
                   key={row.id}
-                  className={`border-t border-fo-border ${
+                  {...(acct ? { 'data-treasury-account': acct } : {})}
+                  className={`border-t border-fo-border scroll-mt-2 ${
                     f.belowMinimum ? 'bg-fo-red/10' : f.reconciliationStale && f.tracked ? 'bg-fo-amber/10' : ''
                   }`}
                 >
-                  <td className="px-3 py-2 text-fo-gold-soft whitespace-nowrap">{String(row.account_id)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <Link
+                      to={row.ctaTo}
+                      className="text-fo-gold-soft hover:text-fo-gold hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fo-gold/50 rounded-sm"
+                    >
+                      {String(row.account_id) || '—'}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2 max-w-[140px] truncate">{String(row.bank_name)}</td>
                   <td className="px-3 py-2 max-w-[120px] truncate">{String(row.owner_entity)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -180,7 +229,7 @@ export function Treasury() {
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
 
       <p className="text-xs text-zinc-600">
         Edit underlying rows in the workbook import or via{' '}

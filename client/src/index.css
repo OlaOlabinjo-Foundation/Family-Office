@@ -28,13 +28,31 @@
 @layer base {
   html {
     @apply antialiased;
+    -webkit-text-size-adjust: 100%;
   }
   #root {
     min-height: 100vh;
+    min-height: 100dvh;
   }
   body {
-    @apply bg-fo-black text-white min-h-screen m-0;
+    @apply bg-fo-black text-white min-h-screen m-0 overflow-x-hidden;
     font-family: var(--font-sans);
+    -webkit-tap-highlight-color: rgba(212, 175, 55, 0.15);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+  /* Prevent iOS zoom on focus — inputs below 16px trigger auto-zoom */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: inherit;
+    }
   }
   ::selection {
     background-color: rgba(212, 175, 55, 0.35);
@@ -46,5 +64,138 @@
   }
   .focus-ring-inset:focus-visible {
     outline-offset: -2px;
+  }
+}
+
+@layer components {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .btn-touch {
+    @apply inline-flex min-h-11 items-center justify-center px-4 py-2.5 text-sm;
+  }
+
+  .table-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
+  }
+
+  .table-scroll::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.35);
+    border-radius: 999px;
+  }
+
+  .table-scroll table {
+    min-width: 640px;
+  }
+
+  @media (min-width: 768px) {
+    .table-scroll table {
+      min-width: 0;
+    }
+    .table-scroll-hint {
+      display: none;
+    }
+  }
+}
+
+.chairman-executive-shell {
+  background: linear-gradient(180deg, #0a0a0a 0%, #111 40%, #0d0d0d 100%);
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.chairman-executive .chairman-topbar {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Sit below the mobile app chrome (Menu / title / Out) */
+@media (max-width: 1023px) {
+  .app-shell--chairman-exec .chairman-executive .chairman-topbar {
+    top: calc(3.25rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+.app-shell--chairman-exec main {
+  overflow-x: clip;
+}
+
+.chairman-executive .chairman-hero {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06) 0%, transparent 55%);
+}
+
+.chairman-executive .chairman-card {
+  transition: border-color 0.2s ease;
+}
+
+.chairman-executive .chairman-card:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
+.chairman-executive .chairman-action {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+/* Chairman / principal — readable on phone */
+@media (max-width: 639px) {
+  .chairman-executive .chairman-hero {
+    padding-top: 1.25rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .chairman-executive .chairman-hero h1 {
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .chairman-executive .chairman-card {
+    padding: 1rem;
+  }
+
+  .chairman-executive .chairman-action {
+    min-height: 3.25rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .chairman-executive .grid[class*='grid-cols-2'],
+  .chairman-executive .grid[class*='grid-cols-4'] {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .chairman-overview,
+  .chairman-executive-shell {
+    max-width: none !important;
+  }
+  aside,
+  header.app-chrome,
+  button[aria-label='Open menu'],
+  button[aria-label='Close menu'] {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
   }
 }

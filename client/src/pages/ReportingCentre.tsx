@@ -1,27 +1,85 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ChairmanReportsView } from '../components/chairman/ChairmanReportsView'
+import { ReportHumanReadout } from '../components/reports/ReportHumanReadout'
+import { ReportShareBar } from '../components/reports/ReportShareBar'
+import { downloadReportJson, downloadReportExcel, downloadReportPdf } from '../lib/reportDownload'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useNotify } from '../context/NotificationContext'
+import { useReportFromUrl } from '../hooks/useReportFromUrl'
 import { apiFetch } from '../lib/api'
+import { REPORT_CATALOG, reportPath, type ReportSlug } from '../lib/reportsCatalog'
+import { setDocumentTitle } from '../lib/documentTitle'
 
-const REPORTS = [
-  { slug: 'monthly', label: 'Monthly family office report' },
-  { slug: 'net-worth', label: 'Net worth report' },
-  { slug: 'liquidity', label: 'Liquidity report' },
-  { slug: 'risk', label: 'Risk report' },
-  { slug: 'property', label: 'Property report' },
-  { slug: 'liability', label: 'Liability report' },
-  { slug: 'exposure', label: 'Investment exposure report' },
-  { slug: 'documents', label: 'Document compliance report' },
-] as const
+const REPORTS = REPORT_CATALOG
+
+function relatedViewsForReport(slug: ReportSlug): { to: string; label: string }[] {
+  switch (slug) {
+    case 'monthly':
+      return [
+        { to: '/', label: 'Command Centre' },
+        { to: '/snapshots', label: 'Snapshots' },
+        { to: '/actions', label: 'Next actions' },
+      ]
+    case 'net-worth':
+      return [
+        { to: '/', label: 'Command Centre' },
+        { to: '/data/master', label: 'Master register' },
+        { to: '/assets', label: 'Asset intelligence' },
+      ]
+    case 'liquidity':
+      return [
+        { to: '/treasury', label: 'Treasury' },
+        { to: '/', label: 'Command Centre' },
+        { to: '/risk', label: 'Risk' },
+      ]
+    case 'risk':
+      return [
+        { to: '/risk', label: 'Risk module' },
+        { to: '/decisions', label: 'Decisions' },
+        { to: '/actions', label: 'Next actions' },
+      ]
+    case 'property':
+      return [
+        { to: '/assets', label: 'Asset intelligence' },
+        { to: '/search?q=' + encodeURIComponent('property'), label: 'Search' },
+        { to: '/data/master', label: 'Master register' },
+      ]
+    case 'liability':
+      return [
+        { to: '/risk', label: 'Risk' },
+        { to: '/treasury', label: 'Treasury' },
+        { to: '/search?q=' + encodeURIComponent('debt'), label: 'Search' },
+      ]
+    case 'exposure':
+      return [
+        { to: '/assets', label: 'Asset intelligence' },
+        { to: '/risk', label: 'Risk' },
+        { to: '/', label: 'Command Centre' },
+      ]
+    case 'documents':
+      return [
+        { to: '/documents', label: 'Compliance tracker' },
+        { to: '/decisions', label: 'Decisions' },
+        { to: '/actions', label: 'Next actions' },
+      ]
+    default:
+      return [{ to: '/', label: 'Command Centre' }]
+  }
+}
 
 export function ReportingCentre() {
+  const { user } = useAuth()
+  if (user?.role === 'chairman') return <ChairmanReportsView />
+  return <ReportingCentreOperator />
+}
+
+function ReportingCentreOperator() {
   const { token } = useAuth()
   const { show: notify } = useNotify()
+  const { invalidSlug, last, lastSlug, reportBusy, reportErr, isDetailView } = useReportFromUrl(token)
   const [history, setHistory] = useState<{ id: number; filename: string; status: string; created_at: string }[]>([])
-  const [last, setLast] = useState<Record<string, unknown> | null>(null)
-  const [reportBusy, setReportBusy] = useState<string | null>(null)
-  const [reportErr, setReportErr] = useState<string | null>(null)
   const [exportBusy, setExportBusy] = useState<'pdf' | 'excel' | null>(null)
 
   useEffect(() => {
@@ -39,18 +97,9 @@ export function ReportingCentre() {
     }
   }, [token])
 
-  async function openReport(slug: string) {
-    setReportErr(null)
-    setReportBusy(slug)
-    try {
-      const data = await apiFetch<Record<string, unknown>>(`/api/reports/${slug}`, { token })
-      setLast(data)
-    } catch (e) {
-      setReportErr((e as Error).message)
-    } finally {
-      setReportBusy(null)
-    }
-  }
+  useEffect(() => {
+    setDocumentTitle('Reporting centre')
+  }, [])
 
   function printReport() {
     window.print()
@@ -60,34 +109,7 @@ export function ReportingCentre() {
     if (!last) return
     setExportBusy('pdf')
     try {
-      const { jsPDF } = await import('jspdf')
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-      const margin = 48
-      let y = margin
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.setTextColor(212, 175, 55)
-      doc.text(String(last.title ?? 'Ola Olabinjo Investment — Report'), margin, y)
-      y += 28
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(35, 35, 35)
-      const rows = flattenReportRows(last)
-      const lineHeight = 11
-      const maxY = 780
-      for (const row of rows) {
-        const text = `${row.key}: ${String(row.value)}`
-        const chunks = doc.splitTextToSize(text, 500)
-        for (const chunk of chunks) {
-          if (y > maxY) {
-            doc.addPage()
-            y = margin
-          }
-          doc.text(chunk, margin, y)
-          y += lineHeight
-        }
-      }
-      doc.save(`OOI-report-${Date.now()}.pdf`)
+      await downloadReportPdf(last)
       notify('PDF report downloaded', 'success')
     } catch (e) {
       notify((e as Error).message || 'PDF export failed', 'error')
@@ -100,12 +122,7 @@ export function ReportingCentre() {
     if (!last) return
     setExportBusy('excel')
     try {
-      const XLSX = await import('xlsx')
-      const rows = flattenReportRows(last)
-      const ws = XLSX.utils.json_to_sheet(rows)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Report')
-      XLSX.writeFile(wb, `OOI-report-${Date.now()}.xlsx`)
+      await downloadReportExcel(last)
       notify('Excel report downloaded', 'success')
     } catch (e) {
       notify((e as Error).message || 'Excel export failed', 'error')
@@ -124,6 +141,16 @@ export function ReportingCentre() {
         />
       </div>
 
+      {invalidSlug ? (
+        <div role="alert" className="print:hidden rounded-lg border border-fo-red/30 bg-fo-red/5 px-4 py-3 text-sm text-fo-red">
+          Unknown report slug. Pick a report below or open the{' '}
+          <Link to={reportPath('monthly')} className="text-fo-gold-soft underline">
+            monthly pack
+          </Link>
+          .
+        </div>
+      ) : null}
+
       {reportErr ? (
         <div role="alert" className="print:hidden rounded-lg border border-fo-red/30 bg-fo-red/5 px-4 py-3 text-sm text-fo-red">
           {reportErr}
@@ -132,20 +159,28 @@ export function ReportingCentre() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 print:hidden">
         {REPORTS.map((r) => (
-          <button
+          <Link
             key={r.slug}
-            type="button"
-            disabled={!!reportBusy}
+            to={reportPath(r.slug)}
             aria-busy={reportBusy === r.slug}
-            onClick={() => openReport(r.slug)}
-            className="rounded-xl border border-fo-border bg-fo-graphite/50 px-4 py-3 text-left text-sm text-zinc-200 hover:border-fo-gold hover:text-white disabled:cursor-wait disabled:opacity-60 focus-ring-inset"
+            className={`rounded-xl border bg-fo-graphite/50 px-4 py-3 text-left text-sm text-zinc-200 hover:border-fo-gold hover:text-white focus-ring-inset ${
+              isDetailView && lastSlug === r.slug ? 'border-fo-gold text-white' : 'border-fo-border'
+            } ${reportBusy === r.slug ? 'opacity-60' : ''}`}
           >
-            {reportBusy === r.slug ? 'Loading…' : r.label}
-          </button>
+            {reportBusy === r.slug ? 'Loading\u2026' : r.label}
+          </Link>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-3 print:hidden">
+        <button
+          type="button"
+          disabled={!last || !lastSlug}
+          onClick={() => last && lastSlug && downloadReportJson(last, lastSlug)}
+          className="rounded-md border border-fo-border px-4 py-2 text-sm disabled:opacity-40"
+        >
+          Download JSON
+        </button>
         <button
           type="button"
           disabled={!last}
@@ -161,7 +196,7 @@ export function ReportingCentre() {
           onClick={() => void pdfReport()}
           className="rounded-md border border-fo-gold text-fo-gold-soft px-4 py-2 text-sm disabled:opacity-40"
         >
-          {exportBusy === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}
+          {exportBusy === 'pdf' ? 'Preparing PDF\u2026' : 'Download PDF'}
         </button>
         <button
           type="button"
@@ -170,14 +205,45 @@ export function ReportingCentre() {
           onClick={() => void excelReport()}
           className="rounded-md bg-fo-gold text-fo-black px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
-          {exportBusy === 'excel' ? 'Preparing Excel…' : 'Download Excel'}
+          {exportBusy === 'excel' ? 'Preparing Excel\u2026' : 'Download Excel'}
         </button>
       </div>
 
-      {last ? (
-        <pre className="text-xs bg-fo-panel border border-fo-border rounded-xl p-4 overflow-x-auto text-zinc-200 max-h-[560px] overflow-y-auto">
-          {JSON.stringify(last, null, 2)}
-        </pre>
+      {last && lastSlug ? <ReportShareBar slug={lastSlug} /> : null}
+
+      {last && lastSlug ? (
+        <div className="print:hidden rounded-xl border border-fo-border bg-fo-graphite/40 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">Related views</div>
+          <div className="flex flex-wrap gap-2">
+            {relatedViewsForReport(lastSlug).map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="rounded-md border border-fo-border bg-fo-panel/60 px-3 py-1.5 text-xs text-zinc-200 hover:border-fo-gold/40 hover:text-fo-gold-soft"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {last && lastSlug ? (
+        <>
+          <div className="rounded-xl border border-fo-border bg-fo-panel/40 p-4 md:p-6 print:border-fo-border">
+            <ReportHumanReadout data={last} slug={lastSlug} />
+          </div>
+          <details className="print:hidden group rounded-xl border border-fo-border bg-fo-graphite/30">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm text-fo-gold-soft marker:content-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2">
+              <span>Technical detail (JSON)</span>
+              <span className="text-[10px] uppercase tracking-wider text-zinc-500 group-open:hidden">Show</span>
+              <span className="text-[10px] uppercase tracking-wider text-zinc-500 hidden group-open:inline">Hide</span>
+            </summary>
+            <pre className="text-xs border-t border-fo-border p-4 overflow-x-auto text-zinc-200 max-h-[560px] overflow-y-auto">
+              {JSON.stringify(last, null, 2)}
+            </pre>
+          </details>
+        </>
       ) : null}
 
       <div className="rounded-2xl border border-fo-border p-4 print:hidden">
@@ -185,7 +251,7 @@ export function ReportingCentre() {
         <ul className="text-xs text-zinc-500 space-y-1 max-h-40 overflow-y-auto">
           {history.map((h) => (
             <li key={h.id}>
-              {h.created_at} — {h.filename} — {h.status}
+              {h.created_at} ? {h.filename} ? {h.status}
             </li>
           ))}
           {!history.length && <li>No imports logged yet.</li>}
@@ -195,25 +261,3 @@ export function ReportingCentre() {
   )
 }
 
-function flattenReportRows(data: Record<string, unknown>) {
-  const rows: Record<string, unknown>[] = []
-  const walk = (obj: unknown, prefix = '') => {
-    if (obj === null || obj === undefined) return
-    if (Array.isArray(obj)) {
-      obj.forEach((item, i) => walk(item, `${prefix}[${i}]`))
-      return
-    }
-    if (typeof obj === 'object') {
-      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-        const key = prefix ? `${prefix}.${k}` : k
-        if (v !== null && typeof v === 'object' && !Array.isArray(v)) walk(v, key)
-        else if (Array.isArray(v)) rows.push({ key, value: JSON.stringify(v) })
-        else rows.push({ key, value: v as unknown })
-      }
-    } else {
-      rows.push({ key: prefix, value: obj })
-    }
-  }
-  walk(data)
-  return rows.length ? rows : [{ key: 'payload', value: JSON.stringify(data) }]
-}

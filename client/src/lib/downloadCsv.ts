@@ -49,3 +49,29 @@ export async function downloadApiCsv(
   URL.revokeObjectURL(url)
   opts?.onSuccess?.()
 }
+
+function escapeCsvCell(v: unknown): string {
+  const s = v == null ? '' : String(v)
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+/** Build CSV text and trigger a browser download (client-side export). */
+export function downloadTextCsv(filename: string, csv: string, opts?: CsvDownloadOpts) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+  opts?.onSuccess?.()
+}
+
+export function rowsToCsv(rows: Record<string, unknown>[], columns: string[]): string {
+  const lines = [columns.join(',')]
+  for (const r of rows) {
+    lines.push(columns.map((c) => escapeCsvCell(r[c])).join(','))
+  }
+  return lines.join('\n')
+}
