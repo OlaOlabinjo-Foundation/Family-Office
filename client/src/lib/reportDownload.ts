@@ -1,4 +1,5 @@
 import { flattenReportRows } from '../components/reports/ReportHumanReadout'
+import { FOUNDATION_RGB } from './foundationTheme'
 import type { ReportSlug } from './reportsCatalog'
 
 export function downloadReportJson(data: Record<string, unknown>, slug: ReportSlug) {
@@ -18,12 +19,12 @@ export async function downloadReportPdf(data: Record<string, unknown>) {
   let y = margin
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(14)
-  doc.setTextColor(212, 175, 55)
+  doc.setTextColor(...FOUNDATION_RGB.harvest)
   doc.text(String(data.title ?? 'Ola Olabinjo Investment — Report'), margin, y)
   y += 28
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(35, 35, 35)
+  doc.setTextColor(...FOUNDATION_RGB.ink)
   const rows = flattenReportRows(data)
   const lineHeight = 11
   const maxY = 780

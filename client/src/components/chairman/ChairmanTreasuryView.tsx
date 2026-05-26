@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { LoadingBlock } from '../ui/LoadingBlock'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
-import { formatCompactNgn } from '../../lib/format'
+import { formatCompactNgn, formatMoneyCompact } from '../../lib/format'
 import { ChairmanPageChrome } from './ChairmanPageChrome'
 
 type CashRow = Record<string, unknown> & {
@@ -56,7 +56,7 @@ function MetricCard({
 function AccountCard({ row }: { row: CashRow }) {
   const f = row.flags
   const acct = String(row.account_id || '').trim()
-  const balance = formatCompactNgn(row.current_balance as number | null)
+  const balance = formatMoneyCompact(row.current_balance as number | null, row.currency as string)
   const currency = String(row.currency || 'NGN')
 
   return (

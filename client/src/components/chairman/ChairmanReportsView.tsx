@@ -108,7 +108,7 @@ export function ChairmanReportsView() {
               type="button"
               disabled={exportBusy}
               onClick={() => void pdfReport()}
-              className="rounded-lg bg-gradient-to-r from-fo-gold to-amber-600 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-fo-black disabled:opacity-50"
+              className="rounded-lg bg-fo-gold px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-fo-black hover:bg-fo-gold/90 disabled:opacity-50"
             >
               {exportBusy ? 'PDF…' : 'Download PDF'}
             </button>

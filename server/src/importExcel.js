@@ -1,4 +1,5 @@
 import XLSX from 'xlsx';
+import { normalizeCurrencyCode } from './currency.js';
 
 export function normHeader(h) {
   return String(h ?? '')
@@ -99,7 +100,7 @@ function rowToRecord(entity, row, map) {
         ownership_structure: String(getCell(row, map, 'Ownership Structure')),
         jurisdiction: String(getCell(row, map, 'Jurisdiction')),
         current_value: parseNumber(getCell(row, map, 'Current Value')),
-        currency: String(getCell(row, map, 'Currency')),
+        currency: normalizeCurrencyCode(getCell(row, map, 'Currency')),
         annual_income: parseNumber(getCell(row, map, 'Annual Income')),
         associated_debt: parseNumber(getCell(row, map, 'Associated Debt')),
         net_value: parseNumber(getCell(row, map, 'Net Value')),
@@ -120,7 +121,7 @@ function rowToRecord(entity, row, map) {
         account_name: String(getCell(row, map, 'Account Name')),
         owner_entity: String(getCell(row, map, 'Owner Entity')),
         account_type: String(getCell(row, map, 'Account Type')),
-        currency: String(getCell(row, map, 'Currency')),
+        currency: normalizeCurrencyCode(getCell(row, map, 'Currency')),
         current_balance: parseNumber(getCell(row, map, 'Current Balance')),
         average_monthly_outflow: parseNumber(getCell(row, map, 'Average Monthly Outflow')),
         minimum_required_balance: parseNumber(getCell(row, map, 'Minimum Required Balance')),
@@ -146,7 +147,7 @@ function rowToRecord(entity, row, map) {
         purchase_year: String(getCell(row, map, 'Purchase Year')),
         purchase_price: parseNumber(getCell(row, map, 'Purchase Price')),
         current_value: parseNumber(getCell(row, map, 'Current Value')),
-        currency: String(getCell(row, map, 'Currency')),
+        currency: normalizeCurrencyCode(getCell(row, map, 'Currency')),
         mortgage_balance: String(getCell(row, map, 'Mortgage/Payment  Balance', 'Mortgage Balance')),
         occupancy: String(getCell(row, map, 'Occupancy')),
         property_manager: String(getCell(row, map, 'Property Manager')),
@@ -174,7 +175,7 @@ function rowToRecord(entity, row, map) {
         units_shares: parseNumber(getCell(row, map, 'Units / Shares', 'Units/Shares')),
         purchase_price: parseNumber(getCell(row, map, 'Purchase Price')),
         current_price: parseNumber(getCell(row, map, 'Current Price')),
-        currency: String(getCell(row, map, 'Currency')),
+        currency: normalizeCurrencyCode(getCell(row, map, 'Currency')),
         market_value: parseNumber(getCell(row, map, 'Market Value')),
         liquidity: String(getCell(row, map, 'Liquidity')),
         risk_level: String(getCell(row, map, 'Risk Level'))
@@ -213,7 +214,7 @@ function rowToRecord(entity, row, map) {
         board_seat: String(getCell(row, map, 'Board Seat')),
         cost_base: parseNumber(getCell(row, map, 'Cost Base')),
         latest_valuation: parseNumber(getCell(row, map, 'Latest Valuation')),
-        currency: String(getCell(row, map, 'Currency')),
+        currency: normalizeCurrencyCode(getCell(row, map, 'Currency')),
         associated_debt: parseNumber(getCell(row, map, 'Associated Debt')),
         net_value: parseNumber(getCell(row, map, 'Net Value')),
         exit_horizon: String(getCell(row, map, 'Exit Horizon')),
@@ -232,7 +233,7 @@ function rowToRecord(entity, row, map) {
         facility_type: String(getCell(row, map, 'Facility Type')),
         original_amount: parseNumber(getCell(row, map, 'Original Amount')),
         outstanding_balance: outstanding,
-        currency: String(getCell(row, map, 'Currency')),
+        currency: normalizeCurrencyCode(getCell(row, map, 'Currency')),
         interest_rate: String(getCell(row, map, 'Interest Rate')),
         maturity_date: excelDateToIso(getCell(row, map, 'Maturity Date')),
         security_collateral: String(getCell(row, map, 'Security / Collateral', 'Security/Collateral')),

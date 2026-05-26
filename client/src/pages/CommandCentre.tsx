@@ -20,7 +20,8 @@ import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { TableScroll } from '../components/ui/TableScroll'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
-import { formatCompactNgn, formatCompactFx, formatNgn, formatPct } from '../lib/format'
+import { CHART_AXIS, CHART_PALETTE_EXTENDED, CHART_PRIMARY, CHART_TOOLTIP } from '../lib/foundationTheme'
+import { formatCompactNgn, formatCompactFx, formatMoneyCompact, formatNgn, formatPct } from '../lib/format'
 
 type MonthlyMovement =
   | {
@@ -53,11 +54,25 @@ type PropertyReturnRow = {
   name: string
   country: string
   propertyType: string
+  currency: string
+  currentValue: number
   currentValueNgn: number
+  purchasePrice: number | null
   purchasePriceNgn: number | null
   impliedReturnPct: number | null
   riskLevel: string
   propertyPurpose: string | null
+}
+
+type TopHoldingRow = {
+  id: number
+  kind: string
+  name: string
+  category: string
+  currency: string
+  valueNative: number
+  valueNgn: number
+  href: string
 }
 
 type ComplianceDigestItem = {
@@ -102,6 +117,7 @@ type Summary = {
   cashPosition: number
   netWorthFX?: NetWorthFx
   topPropertyByReturn?: PropertyReturnRow[]
+  topHoldingsByValue?: TopHoldingRow[]
   complianceDigest?: ComplianceDigest
   complianceCalendar?: ComplianceCalendarDigest
   monthlyPortfolioMovement?: MonthlyMovement | null
@@ -126,19 +142,7 @@ type Summary = {
   dataQuality?: { items: DataQualityItem[]; allClear: boolean }
 }
 
-const PIE_COLORS = ['#D4AF37', '#F5D76E', '#8a7a3a', '#4b5563', '#1f2937', '#0f172a']
-
-const CHART_TOOLTIP = {
-  contentStyle: {
-    background: '#141414',
-    border: '1px solid #2a2a2a',
-    borderRadius: 10,
-    boxShadow: '0 16px 48px rgba(0,0,0,0.55)',
-  },
-  labelStyle: { color: '#d4d4d8', fontWeight: 600, marginBottom: 4 },
-  itemStyle: { color: '#e4e4e7' },
-  wrapperStyle: { outline: 'none' as const },
-}
+const PIE_COLORS = [...CHART_PALETTE_EXTENDED]
 
 function Kpi({
   label,
@@ -324,8 +328,8 @@ export function CommandCentre() {
             <div>
               <div className="text-[10px] uppercase tracking-[0.3em] text-fo-gold">Family position (book)</div>
               <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
-                Net worth and gross assets are summed in <strong className="text-zinc-300">NGN</strong> from your registers. USD, GBP, and EUR
-                are <strong className="text-zinc-300">indicative</strong> using server FX settings.
+                Each line uses its <strong className="text-zinc-300">Currency</strong> column (GBP, USD, EUR, NGN), converted to NGN book for
+                totals. USD / GBP / EUR columns below are indicative FX only.
               </p>
             </div>
           </div>
@@ -382,6 +386,46 @@ export function CommandCentre() {
         </div>
       ) : null}
 
+      {data.topHoldingsByValue && data.topHoldingsByValue.length > 0 ? (
+        <div className="rounded-2xl border border-fo-border bg-fo-graphite/40 p-5 md:p-6">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-fo-gold mb-1">Largest investments (by book value)</div>
+          <p className="text-xs text-zinc-500 mb-4 max-w-3xl">
+            Ranked by NGN-equivalent value after FX conversion. Native currency shown for each line — ensure the master sheet{' '}
+            <strong className="text-zinc-400">Currency</strong> column is set to GBP for pound investments.
+          </p>
+          <TableScroll maxHeight="max-h-[min(60vh,420px)]">
+            <table className="w-full text-sm text-left">
+              <thead className="text-[10px] uppercase tracking-widest text-zinc-500 border-b border-fo-border">
+                <tr>
+                  <th className="py-2 pr-3">Investment</th>
+                  <th className="py-2 pr-3 hidden sm:table-cell">Category</th>
+                  <th className="py-2 pr-3 text-right">Book value</th>
+                  <th className="py-2 text-right hidden md:table-cell">NGN equivalent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-fo-border/80">
+                {data.topHoldingsByValue.map((h) => (
+                  <tr key={`${h.kind}-${h.id}`} className="text-zinc-300">
+                    <td className="py-2.5 pr-3 text-white max-w-[220px]">
+                      <Link to={h.href} className="hover:text-fo-gold-soft underline-offset-2 hover:underline">
+                        {h.name}
+                      </Link>
+                    </td>
+                    <td className="py-2.5 pr-3 hidden sm:table-cell text-zinc-500">{h.category}</td>
+                    <td className="py-2.5 pr-3 text-right font-mono text-xs whitespace-nowrap">
+                      {formatMoneyCompact(h.valueNative, h.currency)}
+                    </td>
+                    <td className="py-2.5 text-right font-mono text-xs text-zinc-500 hidden md:table-cell">
+                      {formatCompactNgn(h.valueNgn)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+        </div>
+      ) : null}
+
       {data.topPropertyByReturn && data.topPropertyByReturn.length > 0 ? (
         <div className="rounded-2xl border border-fo-border bg-fo-graphite/40 p-5 md:p-6">
           <div className="text-[10px] uppercase tracking-[0.3em] text-fo-gold mb-1">Top property — implied return</div>
@@ -396,8 +440,8 @@ export function CommandCentre() {
                   <th className="py-2 pr-3">Property</th>
                   <th className="py-2 pr-3">Location</th>
                   <th className="py-2 pr-3 hidden sm:table-cell">Type</th>
-                  <th className="py-2 pr-3 text-right">Book value (NGN)</th>
-                  <th className="py-2 pr-3 text-right hidden md:table-cell">Purchase (NGN)</th>
+                  <th className="py-2 pr-3 text-right">Book value</th>
+                  <th className="py-2 pr-3 text-right hidden md:table-cell">Purchase</th>
                   <th className="py-2 text-right">Implied uplift</th>
                 </tr>
               </thead>
@@ -418,9 +462,11 @@ export function CommandCentre() {
                     </td>
                     <td className="py-2.5 pr-3 whitespace-nowrap">{p.country}</td>
                     <td className="py-2.5 pr-3 hidden sm:table-cell text-zinc-500">{p.propertyType}</td>
-                    <td className="py-2.5 pr-3 text-right font-mono text-xs">{formatCompactNgn(p.currentValueNgn)}</td>
+                    <td className="py-2.5 pr-3 text-right font-mono text-xs">
+                      {formatMoneyCompact(p.currentValue, p.currency)}
+                    </td>
                     <td className="py-2.5 pr-3 text-right font-mono text-xs hidden md:table-cell">
-                      {p.purchasePriceNgn != null ? formatCompactNgn(p.purchasePriceNgn) : '—'}
+                      {p.purchasePrice != null ? formatMoneyCompact(p.purchasePrice, p.currency) : '—'}
                     </td>
                     <td className="py-2.5 text-right">
                       {p.impliedReturnPct != null ? (
@@ -671,15 +717,15 @@ export function CommandCentre() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData} margin={{ left: 4, right: 12, top: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                <XAxis dataKey="label" tick={{ fill: '#9ca3af', fontSize: 9 }} interval="preserveStartEnd" height={36} />
-                <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} tickFormatter={(v) => formatCompactNgn(v as number)} width={72} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_AXIS.grid} />
+                <XAxis dataKey="label" tick={{ fill: CHART_AXIS.tick, fontSize: 9 }} interval="preserveStartEnd" height={36} />
+                <YAxis tick={{ fill: CHART_AXIS.tick, fontSize: 10 }} tickFormatter={(v) => formatCompactNgn(v as number)} width={72} />
                 <Tooltip
                   {...CHART_TOOLTIP}
                   formatter={(value) => [formatCompactNgn(Number(value ?? 0)), 'Net position']}
                   labelFormatter={(label) => String(label)}
                 />
-                <Line type="monotone" dataKey="net" name="Net (NGN)" stroke="#D4AF37" strokeWidth={2} dot={{ r: 2, fill: '#F5D76E' }} />
+                <Line type="monotone" dataKey="net" name="Net (NGN)" stroke={CHART_PRIMARY} strokeWidth={2} dot={{ r: 2, fill: CHART_PRIMARY }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -734,9 +780,9 @@ export function CommandCentre() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topCountries} margin={{ left: 8, right: 8, top: 8, bottom: 40 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} angle={-25} textAnchor="end" interval={0} height={60} />
-                <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} tickFormatter={(v) => formatCompactNgn(v as number)} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_AXIS.grid} />
+                <XAxis dataKey="name" tick={{ fill: CHART_AXIS.tick, fontSize: 10 }} angle={-25} textAnchor="end" interval={0} height={60} />
+                <YAxis tick={{ fill: CHART_AXIS.tick, fontSize: 10 }} tickFormatter={(v) => formatCompactNgn(v as number)} />
                 <Tooltip
                   {...CHART_TOOLTIP}
                   formatter={(value) => [formatCompactNgn(Number(value ?? 0)), 'Exposure']}
@@ -744,7 +790,7 @@ export function CommandCentre() {
                 />
                 <Bar
                   dataKey="value"
-                  fill="#D4AF37"
+                  fill={CHART_PRIMARY}
                   radius={[4, 4, 0, 0]}
                   style={{ cursor: topCountries.length ? 'pointer' : 'default' }}
                   onClick={(d: { name?: string }) => {

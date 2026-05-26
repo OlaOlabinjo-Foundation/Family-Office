@@ -29,6 +29,7 @@ import {
   TRACKER_SORT_OLDEST_REQUESTED
 } from './documentFilters.js';
 import { backupDatabaseBeforeImport } from './dbBackup.js';
+import { normalizeCurrencyCode } from './currency.js';
 import { notifyImportSuccess, notifyWeeklyDigest } from './notifyMail.js';
 import { buildTaskInbox, buildWeeklyDigestText } from './taskInbox.js';
 import { listCommunications, createCommunication, sendCommunicationFollowUpEmails } from './communications.js';
@@ -96,6 +97,19 @@ function readWorkspaceVersion() {
 }
 
 const WORKSPACE_VERSION = readWorkspaceVersion();
+
+const CURRENCY_COLUMNS = new Set(['currency']);
+
+/** @param {string} table @param {Record<string, unknown>} body */
+function sanitiseRegisterBody(table, body) {
+  const out = { ...body };
+  for (const key of Object.keys(out)) {
+    if (CURRENCY_COLUMNS.has(key) && out[key] != null && String(out[key]).trim() !== '') {
+      out[key] = normalizeCurrencyCode(out[key]);
+    }
+  }
+  return out;
+}
 
 const app = express();
 applySecurityMiddleware(app);
@@ -1119,7 +1133,7 @@ app.put('/api/data/:table/:id', requireMutation, blockAnalystDirectWrite, (req, 
   const id = Number(req.params.id);
   const row = db.prepare(`SELECT * FROM ${t} WHERE id = ?`).get(id);
   if (!row) return res.status(404).json({ error: 'Not found' });
-  const patch = req.body || {};
+  const patch = sanitiseRegisterBody(t, req.body || {});
   const cols = Object.keys(row).filter(
     (k) => k !== 'id' && k !== 'updated_at' && k !== 'deleted_at' && k !== 'deleted_by'
   );
@@ -1143,7 +1157,7 @@ app.put('/api/data/:table/:id', requireMutation, blockAnalystDirectWrite, (req, 
 app.post('/api/data/:table', requireMutation, blockAnalystDirectWrite, (req, res) => {
   const t = req.params.table;
   if (!TABLES_READ.includes(t)) return res.status(404).json({ error: 'Unknown table' });
-  const body = req.body || {};
+  const body = sanitiseRegisterBody(t, req.body || {});
   const cols = db
     .prepare(`PRAGMA table_info(${t})`)
     .all()

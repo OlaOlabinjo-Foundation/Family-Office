@@ -1,0 +1,29 @@
+# Fly.io — free tier may apply (verify current limits at fly.io/docs/about/pricing).
+# Deploy: fly launch && fly volumes create fo_data --size 1 -r lhr && fly deploy
+
+app = "ooi-family-office"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  FAMILY_OFFICE_AUTH = "sqlite"
+  FAMILY_OFFICE_SQLITE = "/data/family-office.sqlite"
+  FAMILY_OFFICE_VAULT_DIR = "/data/vault"
+  FAMILY_OFFICE_MFA_REQUIRED = "1"
+
+[mounts]
+  source = "fo_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

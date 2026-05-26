@@ -6,15 +6,53 @@ export type ChairmanSpotlight = {
   id: number
   title: string
   subtitle: string
+  currency?: string
+  valueNative?: number
   valueNgn: number
   trendLabel: string
   href: string
   riskLevel: string
 }
 
+export type ChairmanRecommendation = {
+  id?: string
+  headline: string
+  body: string
+  priority: string
+  category?: string
+  confidence?: number
+  ctaTo?: string
+}
+
+export type ChairmanPropertyReturn = {
+  id: number
+  name: string
+  country: string
+  currentValueNgn: number
+  impliedReturnPct: number | null
+}
+
+export type ChairmanHolding = {
+  id: number
+  kind?: string
+  name: string
+  category: string
+  valueNgn: number
+  href?: string
+  /** Source register (e.g. Real estate register, not “the only” asset type). */
+  register?: string
+  jurisdiction?: string | null
+  currency?: string
+  valueNative?: number
+}
+
 export type ChairmanExecutiveData = ChairmanBriefInput & {
   countryExposure?: { name: string; value: number }[]
-  recommendations?: { headline: string; body: string; priority: string }[]
+  recommendations?: ChairmanRecommendation[]
+  topPropertyByReturn?: ChairmanPropertyReturn[]
+  topHoldingsByValue?: ChairmanHolding[]
+  portfolioAssets?: ChairmanHolding[]
+  snapshotTrend?: { at: string; netPosition: number; healthScore: number }[]
   chairmanSpotlights?: {
     property: ChairmanSpotlight | null
     privateEquity: ChairmanSpotlight | null

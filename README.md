@@ -25,20 +25,29 @@ Do **not** run `npx serve .` from the repo root: there is no app `index.html` th
 
 The React UI on **Vercel** is static only — it does **not** include the database or Express API. You must host the API separately and connect Vercel to it.
 
-### Step 1 — Deploy the API (Render, recommended)
+### Free ($0) — no Render payment
 
-1. Push this repo to GitHub.
-2. On [Render](https://render.com), **New → Blueprint** and select the repo (uses [`render.yaml`](render.yaml)).
-3. After deploy, open the service URL and confirm `https://YOUR-SERVICE.onrender.com/api/health` returns JSON.
-4. Seed the lead user (Render shell or locally against the service):
+**[docs/going-live-free.md](docs/going-live-free.md)** — full guide. Short version:
 
-```bash
-npm run seed-user -w server -- lead "Family Office Lead" lead "YourSecurePassword"
-```
+1. On your PC: `npm run build`, seed users, configure `server/.env` (see doc).
+2. Terminal 1: `npm start` (API + UI on port **8787**).
+3. Terminal 2: `cloudflared tunnel --url http://localhost:8787` → copy the `https://….trycloudflare.com` URL.
+4. Vercel → `COMMAND_CENTRE_API_URL` = that URL → **Redeploy**.
 
-Set `FAMILY_OFFICE_CORS_ORIGINS` on Render to your Vercel URL, e.g. `https://your-project.vercel.app`.
+Helper: `.\scripts\start-tunnel.ps1`
 
-### Step 2 — Connect Vercel
+Other free options: **Fly.io** ([`fly.toml`](fly.toml)), **Oracle Cloud Always Free** VM — see the doc.
+
+Render **free** tier (data resets on redeploy): [`render.free.yaml`](render.free.yaml).  
+Render **paid** (persistent disk): [`render.yaml`](render.yaml).
+
+### Paid — Render with persistent data
+
+1. On [Render](https://render.com), **New → Blueprint** → [`render.yaml`](render.yaml) (starter plan + disk).
+2. Confirm `https://YOUR-SERVICE.onrender.com/api/health` returns JSON.
+3. Seed users and set `FAMILY_OFFICE_CORS_ORIGINS` to your Vercel URL.
+
+### Connect Vercel (all options)
 
 1. In Vercel → your project → **Settings → General**:
    - **Root Directory** = `.` (repo root) **or** `client` (both include an `/api` proxy).

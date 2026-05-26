@@ -1,0 +1,27 @@
+# Render FREE tier — no payment, but NO persistent disk.
+# SQLite and vault are wiped on redeploy / cold start. Testing only.
+# For production data, use docs/going-live-free.md (Cloudflare Tunnel or Fly.io).
+
+services:
+  - type: web
+    name: ooi-family-office-free
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FAMILY_OFFICE_AUTH
+        value: sqlite
+      - key: FAMILY_OFFICE_SQLITE
+        value: /tmp/family-office.sqlite
+      - key: FAMILY_OFFICE_VAULT_DIR
+        value: /tmp/vault
+      - key: FAMILY_OFFICE_MFA_REQUIRED
+        value: "0"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FAMILY_OFFICE_MFA_KEY
+        generateValue: true

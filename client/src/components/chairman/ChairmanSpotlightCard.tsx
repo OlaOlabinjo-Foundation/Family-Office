@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatCompactNgn } from '../../lib/format'
+import { formatCompactNgn, formatMoneyCompact } from '../../lib/format'
 import type { ChairmanSpotlight } from '../../lib/chairmanExecutive'
 
 const KIND_LABEL: Record<string, string> = {
@@ -11,7 +11,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 
 const KIND_GRADIENT: Record<string, string> = {
-  property: 'from-amber-900/40 via-stone-800/80 to-fo-black',
+  property: 'from-fo-gold/25 via-stone-800/80 to-fo-black',
   private_equity: 'from-indigo-950/50 via-fo-graphite to-fo-black',
   securities: 'from-sky-950/40 via-fo-graphite to-fo-black',
   cash: 'from-emerald-950/40 via-fo-graphite to-fo-black',
@@ -34,13 +34,20 @@ export function ChairmanSpotlightCard({ item }: { item: ChairmanSpotlight }) {
           aria-hidden
         />
         <div className="absolute bottom-3 left-3 right-3">
-          <p className="text-[10px] uppercase tracking-widest text-fo-gold-soft/90">{label}</p>
+          <p className="text-[10px] uppercase tracking-widest text-fo-gold">{label}</p>
           <h3 className="mt-1 font-[family-name:var(--font-display)] text-base text-white line-clamp-3 sm:text-lg">{item.title}</h3>
         </div>
       </div>
       <div className="flex flex-1 flex-col p-4">
         <p className="text-xs text-zinc-500 line-clamp-2">{item.subtitle}</p>
-        <p className="mt-2 font-[family-name:var(--font-display)] text-2xl text-white">{formatCompactNgn(item.valueNgn)}</p>
+        <p className="mt-2 font-[family-name:var(--font-display)] text-2xl text-white">
+          {item.valueNative != null && item.currency && item.currency !== 'NGN'
+            ? formatMoneyCompact(item.valueNative, item.currency)
+            : formatCompactNgn(item.valueNgn)}
+        </p>
+        {item.valueNative != null && item.currency && item.currency !== 'NGN' ? (
+          <p className="text-xs text-zinc-500">Book ≈ {formatCompactNgn(item.valueNgn)}</p>
+        ) : null}
         <p className="mt-1 text-xs text-fo-green">{item.trendLabel}</p>
         <Link
           to={item.href}

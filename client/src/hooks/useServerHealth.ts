@@ -20,6 +20,7 @@ export function useServerHealth() {
   const [credentialStore, setCredentialStore] = useState<CredentialStore>('demo')
   const [auth, setAuth] = useState<HealthAuth | null>(null)
   const [apiOnline, setApiOnline] = useState<boolean | null>(null)
+  const [offlineReason, setOfflineReason] = useState<string | null>(null)
 
   useEffect(() => {
     let c = false
@@ -28,29 +29,52 @@ export function useServerHealth() {
         const res = await fetch(`${API_BASE}/api/health`, {
           credentials: USE_SESSION_COOKIE ? 'include' : 'same-origin',
         })
-        const body = (await res.json().catch(() => ({}))) as {
+        const ct = res.headers.get('content-type') || ''
+        let body: {
           version?: string
           auth?: HealthAuth
           error?: string
           hint?: string
+          detail?: string
+          ok?: boolean
+        } = {}
+        if (ct.includes('application/json')) {
+          body = (await res.json().catch(() => ({}))) as typeof body
+        } else {
+          const text = await res.text().catch(() => '')
+          if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+            throw new Error(
+              'This deployment has no /api proxy. In Vercel set Root Directory to the repo root (.) or to client (which includes client/api), then redeploy.'
+            )
+          }
+          throw new Error(text.slice(0, 200) || res.statusText || 'Health check failed')
         }
         if (!res.ok) {
-          throw new Error(body.hint || body.error || res.statusText)
+          throw new Error(
+            [body.hint, body.error, body.detail].filter(Boolean).join(' — ') || res.statusText || 'Health check failed'
+          )
+        }
+        if (body.ok === false) {
+          throw new Error(
+            [body.hint, body.error, body.detail].filter(Boolean).join(' — ') || 'API reported not ready'
+          )
         }
         if (c) return
         setApiOnline(true)
+        setOfflineReason(null)
         if (typeof body.version === 'string' && body.version.length) setVersion(body.version)
         setAuth(body.auth ?? null)
         const cs = body.auth?.credentialStore
         if (cs === 'env' || cs === 'sqlite' || cs === 'demo') setCredentialStore(cs)
         else if (body.auth?.userSource === 'configured') setCredentialStore('env')
         else setCredentialStore('demo')
-      } catch {
+      } catch (e) {
         if (!c) {
           setApiOnline(false)
           setVersion(null)
           setAuth(null)
           setCredentialStore('demo')
+          setOfflineReason(e instanceof Error ? e.message : 'Cannot reach /api/health')
         }
       }
     })()
@@ -59,5 +83,5 @@ export function useServerHealth() {
     }
   }, [])
 
-  return { version, credentialStore, auth, apiOnline }
+  return { version, credentialStore, auth, apiOnline, offlineReason }
 }

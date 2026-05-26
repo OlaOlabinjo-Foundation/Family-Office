@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useNotify } from '../context/NotificationContext'
 import { apiFetch } from '../lib/api'
 import { downloadApiCsv, downloadExportCsv } from '../lib/downloadCsv'
-import { formatCompactNgn } from '../lib/format'
+import { formatCompactNgn, formatMoneyCompact } from '../lib/format'
 
 type CashRow = Record<string, unknown> & {
   id: number
@@ -214,7 +214,7 @@ function TreasuryOperator() {
                   <td className="px-3 py-2 max-w-[140px] truncate">{String(row.bank_name)}</td>
                   <td className="px-3 py-2 max-w-[120px] truncate">{String(row.owner_entity)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    {formatCompactNgn(row.current_balance as number | null)} {String(row.currency || '')}
+                    {formatMoneyCompact(row.current_balance as number | null, row.currency as string)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-zinc-400">{String(row.last_reconciled_date || '—')}</td>
                   <td className="px-3 py-2">{String(row.risk_level || '—')}</td>

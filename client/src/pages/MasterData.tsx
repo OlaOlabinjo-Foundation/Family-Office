@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { useNotify } from '../context/NotificationContext'
 import { apiFetch } from '../lib/api'
 import { downloadExportCsv, downloadTextCsv, rowsToCsv } from '../lib/downloadCsv'
-import { formatCompactNgn } from '../lib/format'
+import { formatMoneyCompact } from '../lib/format'
 import {
   EMPTY_MASTER_ASSET_DRAFT,
   rowToMasterDraft,
@@ -433,6 +433,9 @@ export function MasterData() {
                   <th className="px-2 py-2" scope="col">
                     Jurisdiction
                   </th>
+                  <th className="px-2 py-2" scope="col">
+                    CCY
+                  </th>
                   <th className="px-2 py-2 text-right" scope="col">
                     Net value
                   </th>
@@ -465,7 +468,10 @@ export function MasterData() {
                       <td className="px-2 py-1 max-w-xs truncate">{String(r.asset_name)}</td>
                       <td className="px-2 py-1">{String(r.asset_category)}</td>
                       <td className="px-2 py-1">{String(r.jurisdiction)}</td>
-                      <td className="px-2 py-1 text-right">{formatCompactNgn(r.net_value as number | null)}</td>
+                      <td className="px-2 py-1 text-zinc-400">{String(r.currency || 'NGN')}</td>
+                      <td className="px-2 py-1 text-right whitespace-nowrap">
+                        {formatMoneyCompact((r.net_value ?? r.current_value) as number | null, r.currency as string)}
+                      </td>
                       <td className="px-2 py-1 whitespace-nowrap">
                         <div className="flex flex-wrap items-center gap-2">
                           {canWrite && !showArchived ? (

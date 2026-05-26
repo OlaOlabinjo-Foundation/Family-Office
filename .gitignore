@@ -9,6 +9,8 @@ server/data/
 .DS_Store
 .env
 .env.local
+server/.env
+server/data/DEPLOY-CREDENTIALS.local.txt
 playwright-report/
 test-results/
 blob-report/

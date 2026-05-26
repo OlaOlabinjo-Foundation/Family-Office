@@ -1,6 +1,6 @@
-# One-click API + UI (recommended for production).
-# Deploy at https://render.com — connect this repo and apply this Blueprint.
-# For Vercel frontend only, deploy this API service and set COMMAND_CENTRE_API_URL on Vercel.
+# PAID on Render: starter plan + persistent disk (data kept across deploys).
+# For $0 hosting see docs/going-live-free.md (Cloudflare Tunnel) or render.free.yaml (test only).
+# Deploy at https://render.com — Blueprint. Vercel: set COMMAND_CENTRE_API_URL to this service URL.
 
 services:
   - type: web

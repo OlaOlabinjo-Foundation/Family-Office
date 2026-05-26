@@ -16,7 +16,10 @@
     "serve:portal": "npm run build -w client && npx serve client/dist -c serve-portal.json",
     "test": "npm run test -w server",
     "test:e2e": "playwright test",
-    "backup": "npm run backup -w server"
+    "backup": "npm run backup -w server",
+    "check:live-api": "node scripts/check-live-api.mjs",
+    "setup:go-live": "powershell -ExecutionPolicy Bypass -File scripts/setup-go-live.ps1",
+    "seed:users": "node scripts/seed-all-users.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",

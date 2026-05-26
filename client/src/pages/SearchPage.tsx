@@ -4,7 +4,7 @@ import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
-import { formatCompactNgn } from '../lib/format'
+import { formatMoneyCompact } from '../lib/format'
 
 type SearchPayload = {
   query: string
@@ -146,7 +146,7 @@ export function SearchPage() {
                     </Link>
                     <span className="text-zinc-300"> · {c.account_name || c.account_id}</span>
                     <div className="text-xs text-zinc-500 mt-1">
-                      {c.owner_entity} · {formatCompactNgn(c.current_balance)} {c.currency}
+                      {c.owner_entity} · {formatMoneyCompact(c.current_balance, c.currency)}
                     </div>
                   </li>
                 )
@@ -168,7 +168,7 @@ export function SearchPage() {
                       <span className="text-white">Property</span>
                     )}
                     <div className="text-xs text-zinc-500 mt-1">
-                      {r.property_id} · {r.country} · {formatCompactNgn(r.current_value)} {r.currency}
+                      {r.property_id} · {r.country} · {formatMoneyCompact(r.current_value, r.currency)}
                     </div>
                   </li>
                 )
@@ -218,7 +218,7 @@ export function SearchPage() {
                       <span className="text-white">{L.facility_type || 'Facility'}</span>
                     )}
                     <div className="text-xs text-zinc-500 mt-1">
-                      {L.lender} · {L.borrower_entity} · {formatCompactNgn(L.outstanding_balance)} {L.currency}
+                      {L.lender} · {L.borrower_entity} · {formatMoneyCompact(L.outstanding_balance, L.currency)}
                     </div>
                   </li>
                 )

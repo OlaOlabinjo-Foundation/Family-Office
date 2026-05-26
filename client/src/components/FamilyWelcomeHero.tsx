@@ -61,7 +61,7 @@ export function FamilyWelcomeHero({
       initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: reduceMotion ? 0 : 0.4 }}
-      className="overflow-hidden rounded-3xl border border-fo-border/90 bg-gradient-to-br from-fo-graphite via-fo-black to-[#070708] shadow-[0_1px_0_0_rgba(212,175,55,0.12),0_24px_48px_-24px_rgba(0,0,0,0.7)]"
+      className="overflow-hidden rounded-3xl border border-fo-border/90 bg-gradient-to-br from-fo-graphite via-fo-black to-fo-black shadow-[0_1px_0_0_rgba(200,135,36,0.14),0_24px_48px_-24px_rgba(0,0,0,0.7)]"
       aria-labelledby="command-centre-hero-title"
     >
       <div

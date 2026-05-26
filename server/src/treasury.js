@@ -1,3 +1,5 @@
+import { amountToNgn } from './currency.js';
+
 const MS_DAY = 86400000;
 
 function parseIsoDate(s) {
@@ -55,8 +57,9 @@ export function getTreasuryOverview(database) {
     const tracked = cashTreasuryTracked(c);
     const bal = c.current_balance;
     if (bal != null && Number.isFinite(bal)) {
-      totalBalance += bal;
-      if (tracked) trackedBalance += bal;
+      const balNgn = amountToNgn(bal, c.currency);
+      totalBalance += balNgn;
+      if (tracked) trackedBalance += balNgn;
     }
 
     let belowMinimum = false;

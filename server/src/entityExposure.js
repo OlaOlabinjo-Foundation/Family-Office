@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { amountToNgn, masterBookValueNgn } from './currency.js';
 import { ensureSoftDeleteColumns, SOFT_DELETE_TABLES } from './registerData.js';
 
 function activeClause(table) {
@@ -26,54 +27,57 @@ export function buildEntityExposure(database = db) {
 
   const master = database
     .prepare(
-      `SELECT legal_owner_entity, net_value, current_value, associated_debt FROM master_assets WHERE 1=1${activeClause('master_assets')}`
+      `SELECT legal_owner_entity, net_value, current_value, associated_debt, currency FROM master_assets WHERE 1=1${activeClause('master_assets')}`
     )
     .all();
   for (const m of master) {
     const b = bucket(m.legal_owner_entity);
     if (!b) continue;
-    const nv =
-      m.net_value ??
-      (m.current_value != null ? Number(m.current_value) - (Number(m.associated_debt) || 0) : 0);
-    b.assets += Number(nv) || 0;
+    b.assets += masterBookValueNgn(m);
   }
 
   const cash = database
-    .prepare(`SELECT owner_entity, current_balance FROM cash_banking WHERE 1=1${activeClause('cash_banking')}`)
+    .prepare(
+      `SELECT owner_entity, current_balance, currency FROM cash_banking WHERE 1=1${activeClause('cash_banking')}`
+    )
     .all();
   for (const c of cash) {
     const b = bucket(c.owner_entity);
     if (!b) continue;
-    b.cash += Number(c.current_balance) || 0;
+    b.cash += amountToNgn(c.current_balance, c.currency);
   }
 
   const re = database
-    .prepare(`SELECT owner_entity, current_value FROM real_estate WHERE 1=1${activeClause('real_estate')}`)
+    .prepare(
+      `SELECT owner_entity, current_value, currency FROM real_estate WHERE 1=1${activeClause('real_estate')}`
+    )
     .all();
   for (const r of re) {
     const b = bucket(r.owner_entity);
     if (!b) continue;
-    b.realEstate += Number(r.current_value) || 0;
+    b.realEstate += amountToNgn(r.current_value, r.currency);
   }
 
   const sec = database
-    .prepare(`SELECT owner_entity, market_value FROM public_securities WHERE 1=1${activeClause('public_securities')}`)
+    .prepare(
+      `SELECT owner_entity, market_value, currency FROM public_securities WHERE 1=1${activeClause('public_securities')}`
+    )
     .all();
   for (const s of sec) {
     const b = bucket(s.owner_entity);
     if (!b) continue;
-    b.securities += Number(s.market_value) || 0;
+    b.securities += amountToNgn(s.market_value, s.currency);
   }
 
   const liab = database
     .prepare(
-      `SELECT borrower_entity, outstanding_balance FROM liabilities WHERE 1=1${activeClause('liabilities')}`
+      `SELECT borrower_entity, outstanding_balance, currency FROM liabilities WHERE 1=1${activeClause('liabilities')}`
     )
     .all();
   for (const L of liab) {
     const b = bucket(L.borrower_entity);
     if (!b) continue;
-    b.liabilities += Number(L.outstanding_balance) || 0;
+    b.liabilities += amountToNgn(L.outstanding_balance, L.currency);
   }
 
   const items = [...map.values()]

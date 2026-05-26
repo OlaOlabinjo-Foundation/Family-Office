@@ -15,7 +15,7 @@ const DEMO_ROLES: { username: string; role: Role; label: string; hint: string }[
 
 export function Login() {
   const { token, setSession } = useAuth()
-  const { version: serverVersion, credentialStore, apiOnline } = useServerHealth()
+  const { version: serverVersion, credentialStore, apiOnline, offlineReason } = useServerHealth()
   const nav = useNavigate()
   const loc = useLocation()
   const [username, setUsername] = useState('lead')
@@ -179,7 +179,7 @@ export function Login() {
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
-          backgroundImage: `linear-gradient(rgba(212,175,55,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.2) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(200,135,36,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(59,94,69,0.2) 1px, transparent 1px)`,
           backgroundSize: '48px 48px',
         }}
         aria-hidden
@@ -197,22 +197,35 @@ export function Login() {
         ) : null}
 
         {apiOnline === false ? (
-          <div role="alert" className="mt-6 rounded-md border border-fo-red/40 bg-fo-red/10 px-3 py-2 text-sm text-fo-red leading-relaxed">
-            <strong className="text-fo-red">API offline.</strong> This site cannot reach{' '}
-            <code className="text-fo-red/90">/api/health</code>.
+          <div role="alert" className="mt-6 rounded-md border border-fo-red/40 bg-fo-red/10 px-3 py-2 text-sm text-fo-red leading-relaxed space-y-2">
+            <p>
+              <strong className="text-fo-red">API offline.</strong> This site cannot reach{' '}
+              <code className="text-fo-red/90">/api/health</code>.
+            </p>
+            {offlineReason ? (
+              <p className="text-fo-red/90 text-xs">{offlineReason}</p>
+            ) : null}
             {typeof window !== 'undefined' &&
             !/localhost|127\.0\.0\.1/.test(window.location.hostname) ? (
-              <>
-                {' '}
-                On Vercel, set <code className="text-fo-red/90">COMMAND_CENTRE_API_URL</code> to your hosted API (e.g.
-                Render) and redeploy — see README “Going live”. Locally, run{' '}
-                <code className="text-fo-red/90">npm run dev</code>.
-              </>
+              <ol className="list-decimal list-inside text-xs text-fo-red/90 space-y-1">
+                <li>
+                  Host the API (Render free blueprint <code>render.free.yaml</code>, Fly.io, or Cloudflare Tunnel — see{' '}
+                  <code>docs/going-live-free.md</code>).
+                </li>
+                <li>
+                  Open <code>https://YOUR-API/api/health</code> in a browser — it must return JSON with{' '}
+                  <code>{'"ok":true'}</code>.
+                </li>
+                <li>
+                  Vercel → Settings → Environment Variables → add{' '}
+                  <code>COMMAND_CENTRE_API_URL</code> = <code>https://YOUR-API</code> (no trailing slash).
+                </li>
+                <li>Redeploy the Vercel project (required after adding the variable).</li>
+              </ol>
             ) : (
-              <>
-                {' '}
+              <p className="text-xs text-fo-red/90">
                 Run <code className="text-fo-red/90">npm run dev</code> from the project folder (API on 8787, UI on 5173).
-              </>
+              </p>
             )}
           </div>
         ) : null}

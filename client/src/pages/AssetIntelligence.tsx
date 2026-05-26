@@ -6,7 +6,7 @@ import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
-import { formatCompactNgn } from '../lib/format'
+import { formatCompactNgn, formatMoneyCompact } from '../lib/format'
 
 type MasterRow = {
   id: number
@@ -16,6 +16,7 @@ type MasterRow = {
   jurisdiction: string
   net_value: number | null
   current_value: number | null
+  currency: string | null
   liquidity: string
   risk_level: string
 }
@@ -110,7 +111,8 @@ function AssetIntelligenceOperator() {
         <div className="grid md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-fo-border p-4 bg-fo-graphite/40">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Gross assets (book)</div>
-          <div className="text-2xl text-fo-gold-soft mt-1">{formatCompactNgn(summary.totalAssets)}</div>
+          <div className="text-2xl text-fo-gold mt-1">{formatCompactNgn(summary.totalAssets)}</div>
+          <div className="text-[10px] text-zinc-600 mt-1">NGN book (FX-adjusted)</div>
         </div>
         <div className="rounded-xl border border-fo-border p-4 bg-fo-graphite/40">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Liquidity ratio</div>
@@ -153,7 +155,7 @@ function AssetIntelligenceOperator() {
         <div className="h-80">
           {treemapData.length ? (
             <ResponsiveContainer width="100%" height="100%">
-              <Treemap data={treemapData} dataKey="size" aspectRatio={4 / 3} stroke="#050505" fill="#D4AF37">
+              <Treemap data={treemapData} dataKey="size" aspectRatio={4 / 3} stroke="#000000" fill="#C8871A">
                 <Tooltip />
               </Treemap>
             </ResponsiveContainer>
@@ -209,7 +211,9 @@ function AssetIntelligenceOperator() {
                     <td className="px-3 py-2 max-w-xs truncate">{r.asset_name}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{r.asset_category}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{r.jurisdiction}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{formatCompactNgn(r.net_value ?? r.current_value)}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {formatMoneyCompact((r.net_value ?? r.current_value) as number | null, r.currency)}
+                    </td>
                     <td className="px-3 py-2">{r.liquidity}</td>
                     <td className="px-3 py-2">{r.risk_level}</td>
                   </tr>

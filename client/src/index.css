@@ -1,19 +1,26 @@
 @import 'tailwindcss';
 
+/* Foundation palette: Harvest · Grove · Linen · Clay on black */
 @theme {
   --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  --color-fo-black: #050505;
-  --color-fo-graphite: #111111;
-  --color-fo-panel: #161616;
-  --color-fo-border: #2a2a2a;
-  --color-fo-gold: #d4af37;
-  --color-fo-gold-soft: #f5d76e;
-  --color-fo-green: #1db954;
-  --color-fo-amber: #f5a623;
-  --color-fo-red: #d0021b;
-  --color-fo-crimson: #7a0a14;
+  --color-fo-black: #000000;
+  --color-fo-graphite: #0a0c0a;
+  --color-fo-panel: #101410;
+  --color-fo-border: #243528;
+  --color-fo-harvest: #c8871a;
+  --color-fo-grove: #3b5e45;
+  --color-fo-linen: #f5efe0;
+  --color-fo-clay: #a64e2a;
+  /* Legacy token names → foundation (keeps existing class names working) */
+  --color-fo-gold: #c8871a;
+  --color-fo-gold-soft: #d49a3a;
+  --color-fo-gold-muted: rgba(200, 135, 36, 0.72);
+  --color-fo-green: #3b5e45;
+  --color-fo-amber: #a64e2a;
+  --color-fo-red: #c45a32;
+  --color-fo-crimson: #7a3520;
 }
 
 @keyframes login-rise {
@@ -35,9 +42,9 @@
     min-height: 100dvh;
   }
   body {
-    @apply bg-fo-black text-white min-h-screen m-0 overflow-x-hidden;
+    @apply bg-fo-black text-fo-linen min-h-screen m-0 overflow-x-hidden;
     font-family: var(--font-sans);
-    -webkit-tap-highlight-color: rgba(212, 175, 55, 0.15);
+    -webkit-tap-highlight-color: rgba(200, 135, 36, 0.15);
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
       env(safe-area-inset-left);
   }
@@ -55,11 +62,11 @@
     }
   }
   ::selection {
-    background-color: rgba(212, 175, 55, 0.35);
-    color: #fff;
+    background-color: rgba(200, 135, 36, 0.35);
+    color: #f5efe0;
   }
   :focus-visible {
-    outline: 2px solid var(--color-fo-gold);
+    outline: 2px solid var(--color-fo-harvest);
     outline-offset: 2px;
   }
   .focus-ring-inset:focus-visible {
@@ -84,7 +91,7 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
+    scrollbar-color: rgba(200, 135, 36, 0.35) transparent;
   }
 
   .table-scroll::-webkit-scrollbar {
@@ -92,7 +99,7 @@
   }
 
   .table-scroll::-webkit-scrollbar-thumb {
-    background: rgba(212, 175, 55, 0.35);
+    background: rgba(200, 135, 36, 0.35);
     border-radius: 999px;
   }
 
@@ -111,7 +118,7 @@
 }
 
 .chairman-executive-shell {
-  background: linear-gradient(180deg, #0a0a0a 0%, #111 40%, #0d0d0d 100%);
+  background: linear-gradient(180deg, #000000 0%, #0a0c0a 40%, #060806 100%);
   width: 100%;
   min-width: 0;
   overflow-x: clip;
@@ -133,7 +140,7 @@
 }
 
 .chairman-executive .chairman-hero {
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06) 0%, transparent 55%);
+  background: linear-gradient(135deg, rgba(200, 135, 36, 0.08) 0%, rgba(59, 94, 69, 0.04) 45%, transparent 70%);
 }
 
 .chairman-executive .chairman-card {
@@ -141,7 +148,7 @@
 }
 
 .chairman-executive .chairman-card:hover {
-  border-color: rgba(212, 175, 55, 0.35);
+  border-color: rgba(200, 135, 36, 0.4);
 }
 
 .chairman-executive .chairman-action {
@@ -179,7 +186,7 @@
 @media print {
   body {
     background: #fff !important;
-    color: #111 !important;
+    color: #101410 !important;
   }
   .no-print {
     display: none !important;

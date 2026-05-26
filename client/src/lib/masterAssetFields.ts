@@ -1,3 +1,5 @@
+import { normalizeCurrency } from './format'
+
 /** Master register columns (matches SQLite `master_assets`). */
 export const MASTER_ASSET_NUMERIC_KEYS = ['current_value', 'annual_income', 'associated_debt', 'net_value'] as const
 
@@ -81,10 +83,10 @@ export const MASTER_ASSET_FIELD_GROUPS: { title: string; fields: MasterAssetFiel
     ],
   },
   {
-    title: 'Valuation (NGN book)',
+    title: 'Valuation',
     fields: [
-      { key: 'current_value', label: 'Current value', control: 'number' },
       { key: 'currency', label: 'Currency', control: 'select', optionsKey: 'currencies' },
+      { key: 'current_value', label: 'Current value (in selected currency)', control: 'number' },
       { key: 'annual_income', label: 'Annual income', control: 'number' },
       { key: 'associated_debt', label: 'Associated debt', control: 'number' },
       { key: 'net_value', label: 'Net value', control: 'number' },
@@ -127,7 +129,11 @@ export function rowToMasterDraft(row: Record<string, unknown>): Record<MasterAss
   const d = { ...EMPTY_MASTER_ASSET_DRAFT }
   for (const key of Object.keys(d) as MasterAssetFieldKey[]) {
     const v = row[key]
-    d[key] = v === null || v === undefined ? '' : String(v)
+    if (key === 'currency') {
+      d.currency = normalizeCurrency(v == null ? '' : String(v))
+    } else {
+      d[key] = v === null || v === undefined ? '' : String(v)
+    }
   }
   return d
 }

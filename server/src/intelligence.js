@@ -3,6 +3,12 @@ import { buildComplianceCalendarDigest } from './complianceCalendar.js';
 import { isOutstandingDocumentRow } from './documentFilters.js';
 import { ctaForRiskContext } from './riskCta.js';
 import { FX_NGN_PER_USD, FX_NGN_PER_GBP, FX_NGN_PER_EUR } from './config.js';
+import {
+  amountToNgn,
+  masterBookValueNative,
+  masterBookValueNgn,
+  normalizeCurrencyCode,
+} from './currency.js';
 
 const MS_DAY = 86400000;
 
@@ -26,7 +32,7 @@ function buildNetWorthFxSnapshot(totalAssetsNgn, totalLiabilitiesNgn, netNgn) {
       ngnPerGbp: FX_NGN_PER_GBP,
       ngnPerEur: FX_NGN_PER_EUR,
       disclaimer:
-        'Indicative FX only: the operational book is in NGN. USD, GBP, and EUR amounts use configurable NGN-per-unit rates (env FX_NGN_PER_USD, FX_NGN_PER_GBP, FX_NGN_PER_EUR).'
+        'Totals are converted to NGN book using each line’s Currency column and env FX rates (FX_NGN_PER_USD, FX_NGN_PER_GBP, FX_NGN_PER_EUR). Enter £ amounts as GBP, not NGN.'
     },
     grossAssets: {
       ngn: totalAssetsNgn,
@@ -64,10 +70,13 @@ function buildTopPropertyByReturn(database, limit = 6) {
   for (const r of rows) {
     const cv = r.current_value != null ? Number(r.current_value) : NaN;
     if (!Number.isFinite(cv) || cv <= 0) continue;
+    const currency = normalizeCurrencyCode(r.currency);
+    const cvNgn = amountToNgn(cv, currency);
     const pp = r.purchase_price != null ? Number(r.purchase_price) : NaN;
     const hasPurchase = Number.isFinite(pp) && pp > 0;
+    const ppNgn = hasPurchase ? amountToNgn(pp, currency) : null;
     const impliedReturnPct = hasPurchase ? ((cv - pp) / pp) * 100 : null;
-    enriched.push({ r, cv, purchasePriceNgn: hasPurchase ? pp : null, impliedReturnPct });
+    enriched.push({ r, cv, cvNgn, currency, purchasePrice: hasPurchase ? pp : null, purchasePriceNgn: ppNgn, impliedReturnPct });
   }
   enriched.sort((a, b) => {
     const aHas = a.impliedReturnPct != null;
@@ -75,14 +84,17 @@ function buildTopPropertyByReturn(database, limit = 6) {
     if (aHas && bHas) return b.impliedReturnPct - a.impliedReturnPct;
     if (aHas) return -1;
     if (bHas) return 1;
-    return b.cv - a.cv;
+    return b.cvNgn - a.cvNgn;
   });
-  return enriched.slice(0, limit).map(({ r, cv, purchasePriceNgn, impliedReturnPct }) => ({
+  return enriched.slice(0, limit).map(({ r, cv, cvNgn, currency, purchasePrice, purchasePriceNgn, impliedReturnPct }) => ({
     id: r.id,
     name: (r.name_address && String(r.name_address).trim()) || r.property_id || `Property #${r.id}`,
     country: r.country || '—',
     propertyType: r.property_type || '—',
-    currentValueNgn: cv,
+    currency,
+    currentValue: cv,
+    currentValueNgn: cvNgn,
+    purchasePrice,
     purchasePriceNgn,
     impliedReturnPct,
     riskLevel: r.risk_level || '—',
@@ -102,6 +114,8 @@ function buildChairmanSpotlights(database) {
         id: propertyRows[0].id,
         title: propertyRows[0].name,
         subtitle: propertyRows[0].country,
+        currency: propertyRows[0].currency,
+        valueNative: propertyRows[0].currentValue,
         valueNgn: propertyRows[0].currentValueNgn,
         trendLabel:
           propertyRows[0].impliedReturnPct != null
@@ -117,12 +131,15 @@ function buildChairmanSpotlights(database) {
     for (const r of database.prepare('SELECT * FROM private_investments').all()) {
       const v = r.latest_valuation != null ? Number(r.latest_valuation) : NaN;
       if (!Number.isFinite(v) || v <= 0) continue;
+      const currency = normalizeCurrencyCode(r.currency);
       peCandidates.push({
         kind: 'private_equity',
         id: r.id,
         title: (r.investment_name && String(r.investment_name).trim()) || r.asset_id || `Investment #${r.id}`,
         subtitle: r.country || r.investment_type || 'Private',
-        valueNgn: v,
+        currency,
+        valueNative: v,
+        valueNgn: amountToNgn(v, currency),
         trendLabel: r.investment_type || 'Private investment',
         href: '/assets',
         riskLevel: r.risk_level || '—'
@@ -135,12 +152,15 @@ function buildChairmanSpotlights(database) {
     for (const r of database.prepare('SELECT * FROM public_securities').all()) {
       const v = r.market_value != null ? Number(r.market_value) : NaN;
       if (!Number.isFinite(v) || v <= 0) continue;
+      const currency = normalizeCurrencyCode(r.currency);
       peCandidates.push({
         kind: 'securities',
         id: r.id,
         title: (r.investment_name && String(r.investment_name).trim()) || r.ticker || `Holding #${r.id}`,
         subtitle: r.country || r.sector || 'Listed',
-        valueNgn: v,
+        currency,
+        valueNative: v,
+        valueNgn: amountToNgn(v, currency),
         trendLabel: r.ticker ? String(r.ticker) : 'Public securities',
         href: '/assets',
         riskLevel: r.risk_level || '—'
@@ -159,12 +179,16 @@ function buildChairmanSpotlights(database) {
       .all();
     const c = cashRows[0];
     if (c && Number(c.current_balance) > 0) {
+      const currency = normalizeCurrencyCode(c.currency);
+      const bal = Number(c.current_balance);
       liquidAccount = {
         kind: 'cash',
         id: c.id,
         title: (c.bank_name && String(c.bank_name).trim()) || c.account_name || `Account #${c.id}`,
-        subtitle: c.owner_entity || c.currency || 'Cash',
-        valueNgn: Number(c.current_balance),
+        subtitle: c.owner_entity || currency || 'Cash',
+        currency,
+        valueNative: bal,
+        valueNgn: amountToNgn(bal, currency),
         trendLabel: c.account_type || 'Bank account',
         href: '/treasury',
         riskLevel: c.risk_level || '—'
@@ -180,17 +204,18 @@ function buildChairmanSpotlights(database) {
     for (const m of master) {
       const liq = String(m.liquidity || '').toLowerCase();
       if (!liq.includes('liquid') && !liq.includes('cash')) continue;
-      const nv =
-        m.net_value ??
-        (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-      if (!Number.isFinite(nv) || nv <= 0) continue;
-      if (!best || nv > best.valueNgn) {
+      const valueNgn = masterBookValueNgn(m);
+      if (valueNgn <= 0) continue;
+      if (!best || valueNgn > best.valueNgn) {
+        const currency = normalizeCurrencyCode(m.currency);
         best = {
           kind: 'liquid_asset',
           id: m.id,
           title: (m.asset_name && String(m.asset_name).trim()) || m.asset_id || `Asset #${m.id}`,
           subtitle: m.asset_category || 'Liquid',
-          valueNgn: nv,
+          currency,
+          valueNative: masterBookValueNative(m),
+          valueNgn,
           trendLabel: m.liquidity || 'Liquid book line',
           href: '/treasury',
           riskLevel: m.risk_level || '—'
@@ -350,6 +375,199 @@ function buildDataQualityChecklist(database, now, ctx) {
   return { items, allClear: items.length === 0 };
 }
 
+/** Portfolio asset class labels — real estate is one class among many. */
+const PORTFOLIO_CLASS = {
+  REAL_ESTATE: 'Real estate',
+  SECURITIES: 'Public securities',
+  PRIVATE: 'Private investments',
+  CASH: 'Cash & banking',
+};
+
+/**
+ * Every principal asset line across registers (master roll-up, real estate, securities, private, cash).
+ * @param {import('better-sqlite3').Database} database
+ */
+function collectPortfolioAssetLines(database) {
+  /** @type {{ kind: string; id: number; name: string; category: string; currency: string; valueNative: number; valueNgn: number; href: string; jurisdiction?: string }[]} */
+  const lines = [];
+
+  const push = (row) => {
+    if (row.valueNgn > 0) lines.push(row);
+  };
+
+  try {
+    const master = database
+      .prepare(`SELECT * FROM master_assets WHERE deleted_at IS NULL OR deleted_at = ''`)
+      .all();
+    for (const m of master) {
+      const valueNgn = masterBookValueNgn(m);
+      push({
+        kind: 'master',
+        id: m.id,
+        name: (m.asset_name && String(m.asset_name).trim()) || m.asset_id || `Asset #${m.id}`,
+        category: (m.asset_category && String(m.asset_category).trim()) || 'Other assets',
+        currency: normalizeCurrencyCode(m.currency),
+        valueNative: masterBookValueNative(m),
+        valueNgn,
+        href: '/data/master',
+        jurisdiction: m.jurisdiction || m.country || undefined,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    for (const r of database
+      .prepare(`SELECT * FROM real_estate WHERE deleted_at IS NULL OR deleted_at = ''`)
+      .all()) {
+      const cv = r.current_value != null ? Number(r.current_value) : NaN;
+      if (!Number.isFinite(cv) || cv <= 0) continue;
+      const currency = normalizeCurrencyCode(r.currency);
+      push({
+        kind: 'real_estate',
+        id: r.id,
+        name: (r.name_address && String(r.name_address).trim()) || r.property_id || `Property #${r.id}`,
+        category: PORTFOLIO_CLASS.REAL_ESTATE,
+        currency,
+        valueNative: cv,
+        valueNgn: amountToNgn(cv, currency),
+        href: '/data/real-estate',
+        jurisdiction: r.country || undefined,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    for (const r of database
+      .prepare(`SELECT * FROM public_securities WHERE deleted_at IS NULL OR deleted_at = ''`)
+      .all()) {
+      const v = r.market_value != null ? Number(r.market_value) : NaN;
+      if (!Number.isFinite(v) || v <= 0) continue;
+      const currency = normalizeCurrencyCode(r.currency);
+      push({
+        kind: 'securities',
+        id: r.id,
+        name: (r.investment_name && String(r.investment_name).trim()) || r.ticker || `Holding #${r.id}`,
+        category: PORTFOLIO_CLASS.SECURITIES,
+        currency,
+        valueNative: v,
+        valueNgn: amountToNgn(v, currency),
+        href: '/data/securities',
+        jurisdiction: r.country || undefined,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    for (const r of database.prepare('SELECT * FROM private_investments').all()) {
+      const v = r.latest_valuation != null ? Number(r.latest_valuation) : NaN;
+      if (!Number.isFinite(v) || v <= 0) continue;
+      const currency = normalizeCurrencyCode(r.currency);
+      const subtype = (r.investment_type && String(r.investment_type).trim()) || '';
+      push({
+        kind: 'private',
+        id: r.id,
+        name: (r.investment_name && String(r.investment_name).trim()) || r.asset_id || `Investment #${r.id}`,
+        category: subtype ? `${PORTFOLIO_CLASS.PRIVATE} · ${subtype}` : PORTFOLIO_CLASS.PRIVATE,
+        currency,
+        valueNative: v,
+        valueNgn: amountToNgn(v, currency),
+        href: '/assets',
+        jurisdiction: r.country || undefined,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    for (const r of database
+      .prepare(`SELECT * FROM cash_banking WHERE deleted_at IS NULL OR deleted_at = ''`)
+      .all()) {
+      const bal = r.current_balance != null ? Number(r.current_balance) : NaN;
+      if (!Number.isFinite(bal) || bal <= 0) continue;
+      const currency = normalizeCurrencyCode(r.currency);
+      push({
+        kind: 'cash',
+        id: r.id,
+        name: (r.bank_name && String(r.bank_name).trim()) || r.account_name || `Account #${r.id}`,
+        category: PORTFOLIO_CLASS.CASH,
+        currency,
+        valueNative: bal,
+        valueNgn: amountToNgn(bal, currency),
+        href: '/data/cash',
+        jurisdiction: r.country || r.owner_entity || undefined,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return lines;
+}
+
+/**
+ * @param {{ kind: string; id: number; name: string; category: string; currency: string; valueNative: number; valueNgn: number; href: string; jurisdiction?: string }[]} lines
+ */
+function allocationFromPortfolioLines(lines) {
+  const byCategory = {};
+  for (const l of lines) {
+    byCategory[l.category] = (byCategory[l.category] || 0) + l.valueNgn;
+  }
+  return Object.entries(byCategory)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/**
+ * Largest book lines by NGN-equivalent value — all portfolio registers.
+ * @param {import('better-sqlite3').Database} database
+ */
+function portfolioRegisterLabel(kind) {
+  const labels = {
+    master: 'Master register',
+    real_estate: 'Real estate register',
+    securities: 'Public securities',
+    private: 'Private investments',
+    cash: 'Cash & banking',
+  };
+  return labels[kind] || kind;
+}
+
+function buildTopHoldingsByValue(database, limit = 8) {
+  return collectPortfolioAssetLines(database)
+    .sort((a, b) => b.valueNgn - a.valueNgn)
+    .slice(0, limit)
+    .map(({ jurisdiction: _j, ...holding }) => ({
+      ...holding,
+      register: portfolioRegisterLabel(holding.kind),
+    }));
+}
+
+/** Full portfolio list for chairman / analytics (all asset classes). */
+function buildPortfolioAssets(database, limit = 50) {
+  return collectPortfolioAssetLines(database)
+    .sort((a, b) => b.valueNgn - a.valueNgn)
+    .slice(0, limit)
+    .map((line) => ({
+      kind: line.kind,
+      id: line.id,
+      name: line.name,
+      category: line.category,
+      currency: line.currency,
+      valueNative: line.valueNative,
+      valueNgn: line.valueNgn,
+      href: line.href,
+      jurisdiction: line.jurisdiction || null,
+      register: portfolioRegisterLabel(line.kind),
+    }));
+}
+
 /** @param {import('better-sqlite3').Database} database */
 export function computeDashboard(database = db) {
   const master = database
@@ -365,53 +583,41 @@ export function computeDashboard(database = db) {
 
   let totalAssets = 0;
   for (const m of master) {
-    const nv =
-      m.net_value ??
-      (m.current_value != null ? m.current_value - (m.associated_debt || 0) : null);
-    if (nv != null && Number.isFinite(nv)) totalAssets += nv;
+    totalAssets += masterBookValueNgn(m);
   }
 
   let totalLiabilities = 0;
   for (const L of liab) {
     if (L.outstanding_balance != null && Number.isFinite(L.outstanding_balance)) {
-      totalLiabilities += L.outstanding_balance;
+      totalLiabilities += amountToNgn(L.outstanding_balance, L.currency);
     }
   }
 
   let cashPosition = 0;
   for (const c of cash) {
-    if (c.current_balance != null && Number.isFinite(c.current_balance)) cashPosition += c.current_balance;
+    if (c.current_balance != null && Number.isFinite(c.current_balance)) {
+      cashPosition += amountToNgn(c.current_balance, c.currency);
+    }
   }
 
   const netPosition = totalAssets - totalLiabilities;
   const liquidityRatio = totalAssets > 0 ? cashPosition / totalAssets : 0;
 
-  const byCategory = {};
-  for (const m of master) {
-    const cat = m.asset_category || 'Uncategorised';
-    const nv =
-      m.net_value ??
-      (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-    byCategory[cat] = (byCategory[cat] || 0) + (nv || 0);
-  }
+  const portfolioLines = collectPortfolioAssetLines(database);
+  const allocation = allocationFromPortfolioLines(portfolioLines);
+  const byCategory = Object.fromEntries(allocation.map((a) => [a.name, a.value]));
 
   const byCountry = {};
-  for (const m of master) {
-    const c = m.jurisdiction || m.country || 'Unknown';
-    const nv =
-      m.net_value ??
-      (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-    byCountry[c] = (byCountry[c] || 0) + (nv || 0);
+  for (const l of portfolioLines) {
+    const c = (l.jurisdiction && String(l.jurisdiction).trim()) || 'Unknown';
+    byCountry[c] = (byCountry[c] || 0) + l.valueNgn;
   }
 
   const now = new Date();
   let highRiskExposure = 0;
   for (const m of master) {
     if (riskRank(m.risk_level) >= 3) {
-      const nv =
-        m.net_value ??
-        (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-      highRiskExposure += nv || 0;
+      highRiskExposure += masterBookValueNgn(m);
     }
   }
 
@@ -542,7 +748,8 @@ export function computeDashboard(database = db) {
     pendingDecisions,
     outstandingDocumentation: outstandingDocs,
     portfolioHealthScore: healthScore,
-    allocation: Object.entries(byCategory).map(([name, value]) => ({ name, value })),
+    allocation,
+    portfolioAssetCount: portfolioLines.length,
     countryExposure: Object.entries(byCountry).map(([name, value]) => ({ name, value })),
     riskSignals: riskSignalsWithCta,
     decisions,
@@ -551,6 +758,8 @@ export function computeDashboard(database = db) {
     snapshotTrend,
     netWorthFX: buildNetWorthFxSnapshot(totalAssets, totalLiabilities, netPosition),
     topPropertyByReturn: buildTopPropertyByReturn(database, 6),
+    topHoldingsByValue: buildTopHoldingsByValue(database, 10),
+    portfolioAssets: buildPortfolioAssets(database, 50),
     chairmanSpotlights: buildChairmanSpotlights(database),
     complianceDigest: {
       outstandingCount: outstandingDocs,
@@ -568,20 +777,12 @@ function buildRiskSignals(database, now) {
   const liab = database.prepare('SELECT * FROM liabilities').all();
   const docs = database.prepare('SELECT * FROM documents').all();
 
-  const totalAssets = master.reduce((s, m) => {
-    const nv =
-      m.net_value ??
-      (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-    return s + (nv || 0);
-  }, 0);
+  const totalAssets = master.reduce((s, m) => s + masterBookValueNgn(m), 0);
 
   const byCategory = {};
   for (const m of master) {
     const cat = m.asset_category || 'Uncategorised';
-    const nv =
-      m.net_value ??
-      (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-    byCategory[cat] = (byCategory[cat] || 0) + (nv || 0);
+    byCategory[cat] = (byCategory[cat] || 0) + masterBookValueNgn(m);
   }
   for (const [cat, val] of Object.entries(byCategory)) {
     const conc = totalAssets > 0 ? val / totalAssets : 0;
@@ -829,10 +1030,7 @@ function buildDecisions(database, now, ctx) {
   const topCat = Object.entries(
     master.reduce((acc, m) => {
       const cat = m.asset_category || 'Other';
-      const nv =
-        m.net_value ??
-        (m.current_value != null ? m.current_value - (m.associated_debt || 0) : 0);
-      acc[cat] = (acc[cat] || 0) + (nv || 0);
+      acc[cat] = (acc[cat] || 0) + masterBookValueNgn(m);
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1])[0];

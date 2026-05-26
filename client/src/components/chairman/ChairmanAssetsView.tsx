@@ -3,38 +3,16 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { LoadingBlock } from '../ui/LoadingBlock'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
+import type { ChairmanExecutiveData, ChairmanHolding } from '../../lib/chairmanExecutive'
 import { formatCompactNgn, formatPct } from '../../lib/format'
 import { setDocumentTitle } from '../../lib/documentTitle'
+import { CHART_PALETTE_EXTENDED } from '../../lib/foundationTheme'
 import { ChairmanPageChrome } from './ChairmanPageChrome'
 
-const ALLOC_COLORS = ['#d4af37', '#5b8def', '#c45c26', '#3d9970', '#9b59b6', '#7f8c8d']
+const ALLOC_COLORS = [...CHART_PALETTE_EXTENDED]
 
-type MasterRow = {
-  id: number
-  asset_id: string
-  asset_name: string
-  asset_category: string
-  jurisdiction: string
-  net_value: number | null
-  current_value: number | null
-  liquidity: string
-  risk_level: string
-  country?: string | null
-}
-
-type Summary = {
-  allocation: { name: string; value: number }[]
-  countryExposure: { name: string; value: number }[]
-  totalAssets: number
-  liquidityRatio: number
-}
-
-function exposureBucket(r: MasterRow) {
-  return (r.jurisdiction || r.country || 'Unknown').trim() || 'Unknown'
-}
-
-function assetValue(r: MasterRow) {
-  return r.net_value ?? r.current_value ?? 0
+function exposureBucket(row: ChairmanHolding & { jurisdiction?: string | null }) {
+  return (row.jurisdiction || 'Unknown').trim() || 'Unknown'
 }
 
 function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -47,28 +25,21 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
   )
 }
 
-function AssetCard({ row }: { row: MasterRow }) {
-  const value = assetValue(row)
+function AssetCard({ row }: { row: ChairmanHolding & { jurisdiction?: string | null } }) {
   return (
     <article className="chairman-card rounded-2xl border border-fo-border/80 bg-fo-graphite/40 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500">{row.asset_category || 'Asset'}</p>
-          <h3 className="mt-1 font-medium text-white line-clamp-2">{row.asset_name || row.asset_id}</h3>
-          <p className="mt-0.5 text-xs text-zinc-500 font-mono">{row.asset_id}</p>
+          <p className="text-[10px] uppercase tracking-widest text-fo-harvest">{row.category}</p>
+          <h3 className="mt-1 font-medium text-white line-clamp-2">{row.name}</h3>
+          <p className="mt-0.5 text-xs text-zinc-500">{row.register || 'Portfolio'}</p>
         </div>
-        <p className="shrink-0 font-[family-name:var(--font-display)] text-lg text-fo-gold-soft">
-          {formatCompactNgn(value)}
+        <p className="shrink-0 font-[family-name:var(--font-display)] text-lg text-fo-gold text-right">
+          {formatCompactNgn(row.valueNgn)}
         </p>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
         <span className="rounded-full border border-fo-border px-2 py-0.5 text-zinc-400">{exposureBucket(row)}</span>
-        {row.liquidity ? (
-          <span className="rounded-full border border-fo-border px-2 py-0.5 text-zinc-400">Liq {row.liquidity}</span>
-        ) : null}
-        {row.risk_level ? (
-          <span className="rounded-full border border-fo-border/60 px-2 py-0.5 text-zinc-500">Risk {row.risk_level}</span>
-        ) : null}
       </div>
     </article>
   )
@@ -77,8 +48,7 @@ function AssetCard({ row }: { row: MasterRow }) {
 export function ChairmanAssetsView() {
   const { token } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [summary, setSummary] = useState<Summary | null>(null)
-  const [rows, setRows] = useState<MasterRow[]>([])
+  const [summary, setSummary] = useState<ChairmanExecutiveData | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -92,14 +62,8 @@ export function ChairmanAssetsView() {
       setLoading(true)
       setErr(null)
       try {
-        const [s, m] = await Promise.all([
-          apiFetch<Summary>('/api/dashboard/summary', { token }),
-          apiFetch<{ items: MasterRow[] }>('/api/data/master_assets', { token }),
-        ])
-        if (!c) {
-          setSummary(s)
-          setRows(m.items)
-        }
+        const s = await apiFetch<ChairmanExecutiveData>('/api/dashboard/summary', { token })
+        if (!c) setSummary(s)
       } catch (e) {
         if (!c) setErr((e as Error).message)
       } finally {
@@ -114,6 +78,13 @@ export function ChairmanAssetsView() {
   const categoryQ = searchParams.get('category')?.trim() ?? ''
   const countryQ = searchParams.get('country')?.trim() ?? ''
 
+  const rows = useMemo(() => {
+    const list = summary?.portfolioAssets?.length
+      ? summary.portfolioAssets
+      : summary?.topHoldingsByValue || []
+    return list as (ChairmanHolding & { jurisdiction?: string | null })[]
+  }, [summary])
+
   const allocation = useMemo(
     () => [...(summary?.allocation || [])].filter((a) => a.value > 0).sort((a, b) => b.value - a.value),
     [summary]
@@ -126,14 +97,14 @@ export function ChairmanAssetsView() {
 
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
-      if (categoryQ && (r.asset_category || '') !== categoryQ) return false
+      if (categoryQ && r.category !== categoryQ) return false
       if (countryQ && exposureBucket(r) !== countryQ) return false
       return true
     })
   }, [rows, categoryQ, countryQ])
 
   const topAssets = useMemo(
-    () => [...filteredRows].sort((a, b) => assetValue(b) - assetValue(a)).slice(0, 18),
+    () => [...filteredRows].sort((a, b) => b.valueNgn - a.valueNgn).slice(0, 18),
     [filteredRows]
   )
 
@@ -148,7 +119,7 @@ export function ChairmanAssetsView() {
 
   if (loading) {
     return (
-      <ChairmanPageChrome title="Assets" subtitle="Master register and concentration">
+      <ChairmanPageChrome title="Assets" subtitle="Full portfolio across all registers">
         <LoadingBlock label="Loading assets…" />
       </ChairmanPageChrome>
     )
@@ -157,7 +128,7 @@ export function ChairmanAssetsView() {
   return (
     <ChairmanPageChrome
       title="Assets"
-      subtitle="Book positions from the master register — category, jurisdiction, and risk at a glance"
+      subtitle="Principal portfolio — master register, real estate, securities, private investments, and cash (real estate is one asset class)"
       actions={
         <Link
           to="/reports"
@@ -176,23 +147,19 @@ export function ChairmanAssetsView() {
       {summary ? (
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Gross assets" value={formatCompactNgn(summary.totalAssets)} />
+            <MetricCard label="Gross assets (master)" value={formatCompactNgn(summary.totalAssets)} />
             <MetricCard label="Liquidity ratio" value={formatPct(summary.liquidityRatio)} />
             <MetricCard
-              label="Register lines"
+              label="Portfolio lines"
               value={String(filteredRows.length)}
-              hint={filteredRows.length !== rows.length ? `of ${rows.length} total` : undefined}
+              hint={filteredRows.length !== rows.length ? `of ${rows.length} across registers` : 'All registers'}
             />
-            <MetricCard
-              label="Categories"
-              value={String(allocation.length)}
-              hint="Active allocation buckets"
-            />
+            <MetricCard label="Asset classes" value={String(allocation.length)} hint="Including real estate, cash, listed, private" />
           </section>
 
           {allocTotal > 0 ? (
             <section>
-              <h2 className="mb-3 text-xs uppercase tracking-[0.35em] text-zinc-500">Allocation</h2>
+              <h2 className="mb-3 text-xs uppercase tracking-[0.35em] text-zinc-500">Allocation by asset class</h2>
               <div className="flex h-2 max-w-2xl overflow-hidden rounded-full bg-fo-panel">
                 {allocation.slice(0, 6).map((a, i) => (
                   <div
@@ -272,7 +239,7 @@ export function ChairmanAssetsView() {
               <button
                 type="button"
                 onClick={() => setSearchParams({})}
-                className="ml-auto text-[10px] uppercase tracking-wider text-fo-gold-soft hover:text-fo-gold"
+                className="text-xs uppercase tracking-wider text-fo-gold-soft hover:underline"
               >
                 Clear filters
               </button>
@@ -281,25 +248,21 @@ export function ChairmanAssetsView() {
 
           <section>
             <h2 className="mb-4 text-xs uppercase tracking-[0.35em] text-zinc-500">
-              Top positions{topAssets.length < filteredRows.length ? ` (top ${topAssets.length})` : ''}
+              {categoryQ || countryQ ? 'Matching assets' : 'Largest positions'}
             </h2>
             {topAssets.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {topAssets.map((r) => (
-                  <AssetCard key={r.id} row={r} />
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {topAssets.map((row) => (
+                  <AssetCard key={`${row.kind}-${row.id}`} row={row} />
                 ))}
               </div>
             ) : (
               <p className="rounded-xl border border-fo-border bg-fo-panel/30 p-6 text-sm text-zinc-500">
-                No assets match the current filters. Import the workbook or clear filters to see the full register.
+                No assets match this filter. Clear filters or import additional registers (securities, cash, private
+                investments).
               </p>
             )}
           </section>
-
-          <footer className="text-[11px] text-zinc-600 border-t border-fo-border/40 pt-6">
-            Principal read-only view · values from master register · use Reports for formal packs and snapshots for
-            point-in-time history.
-          </footer>
         </>
       ) : null}
     </ChairmanPageChrome>

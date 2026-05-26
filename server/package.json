@@ -9,6 +9,7 @@
     "test": "cross-env FAMILY_OFFICE_SQLITE=:memory: SKIP_WORKBOOK_BOOTSTRAP=1 vitest run",
     "test:watch": "cross-env FAMILY_OFFICE_SQLITE=:memory: SKIP_WORKBOOK_BOOTSTRAP=1 vitest",
     "seed-user": "node scripts/seed-app-user.mjs",
+    "normalize-currencies": "node scripts/normalize-currencies.mjs",
     "backup": "node scripts/backup-full.mjs"
   },
   "devDependencies": {

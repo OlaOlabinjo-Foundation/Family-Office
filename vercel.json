@@ -4,5 +4,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "client/dist",
   "framework": null,
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }

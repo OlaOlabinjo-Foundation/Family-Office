@@ -16,9 +16,11 @@ import {
   ChairmanIconReports,
   ChairmanIconTreasury,
 } from './ChairmanIcons'
+import { CHART_PALETTE } from '../../lib/foundationTheme'
+import { ChairmanInvestmentAnalytics } from './ChairmanInvestmentAnalytics'
 import { ChairmanSpotlightCard } from './ChairmanSpotlightCard'
 
-const ALLOC_COLORS = ['#d4af37', '#5b8def', '#c45c26', '#3d9970', '#9b59b6', '#7f8c8d']
+const ALLOC_COLORS = [...CHART_PALETTE]
 
 function countryFlag(name: string): string {
   const n = name.toLowerCase()
@@ -117,7 +119,7 @@ export function ChairmanExecutiveView({ data, onDownloadPdf, pdfBusy }: Props) {
                 type="button"
                 disabled={pdfBusy}
                 onClick={onDownloadPdf}
-                className="col-span-2 rounded-lg bg-gradient-to-r from-fo-gold to-amber-600 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-fo-black disabled:opacity-50 sm:col-auto"
+                className="col-span-2 rounded-lg bg-fo-gold px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-fo-black hover:bg-fo-gold/90 disabled:opacity-50 sm:col-auto"
               >
                 {pdfBusy ? 'PDF…' : 'Board pack PDF'}
               </button>
@@ -132,7 +134,7 @@ export function ChairmanExecutiveView({ data, onDownloadPdf, pdfBusy }: Props) {
           className="pointer-events-none absolute inset-0 opacity-40"
           style={{
             backgroundImage:
-              'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(212,175,55,0.12), transparent), url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'60\' height=\'60\' viewBox=\'0 0 60 60\'%3E%3Cg fill=\'%23d4af37\' fill-opacity=\'0.03\'%3E%3Cpath d=\'M0 0h30v30H0zm30 30h30v30H30z\'/%3E%3C/g%3E%3C/svg%3E")',
+              'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(200,135,36,0.12), transparent), url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'60\' height=\'60\' viewBox=\'0 0 60 60\'%3E%3Cg fill=\'%23C8871A\' fill-opacity=\'0.03\'%3E%3Cpath d=\'M0 0h30v30H0zm30 30h30v30H30z\'/%3E%3C/g%3E%3C/svg%3E")',
           }}
           aria-hidden
         />
@@ -191,6 +193,8 @@ export function ChairmanExecutiveView({ data, onDownloadPdf, pdfBusy }: Props) {
       </section>
 
       <div className="px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+        <ChairmanInvestmentAnalytics data={data} />
+
         {/* Spotlight cards */}
         <section>
           <h2 className="mb-4 text-xs uppercase tracking-[0.35em] text-zinc-500">Book highlights</h2>
@@ -210,7 +214,7 @@ export function ChairmanExecutiveView({ data, onDownloadPdf, pdfBusy }: Props) {
         {/* Insights row */}
         <section className="grid gap-6 lg:grid-cols-[1fr_280px]">
           <div className="chairman-card rounded-2xl border border-fo-border/80 bg-fo-graphite/50 p-5 md:p-6">
-            <h2 className="font-[family-name:var(--font-display)] text-lg text-white">Insights & recommendations</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-lg text-white">Insights</h2>
             <p className="mt-1 text-xs text-zinc-500">Generated from the live book — for awareness, not investment advice.</p>
             <ul className="mt-5 space-y-4">
               {insights.length > 0 ? (
@@ -236,7 +240,7 @@ export function ChairmanExecutiveView({ data, onDownloadPdf, pdfBusy }: Props) {
             </ul>
           </div>
           <div className="chairman-card rounded-2xl border border-fo-border/80 bg-fo-graphite/50 p-5 flex flex-col items-center">
-            <h3 className="text-xs uppercase tracking-widest text-zinc-500 w-full text-left">Allocation</h3>
+            <h3 className="text-xs uppercase tracking-widest text-zinc-500 w-full text-left">Allocation by asset class</h3>
             <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row lg:flex-col lg:items-center">
               <AllocationDonut allocation={allocation} />
               <ul className="w-full space-y-2 text-xs">

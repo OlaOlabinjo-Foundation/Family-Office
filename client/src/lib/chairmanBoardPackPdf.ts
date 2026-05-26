@@ -1,13 +1,14 @@
 import { buildChairmanNarrative, type ChairmanBriefInput } from './chairmanNarrative'
+import { FOUNDATION_RGB } from './foundationTheme'
 import { formatCompactNgn, formatPct } from './format'
 
 export type ChairmanBoardPackInput = ChairmanBriefInput & {
   recommendations?: { headline: string; body: string; priority: string }[]
 }
 
-const GOLD: [number, number, number] = [212, 175, 55]
-const INK: [number, number, number] = [35, 35, 35]
-const MUTED: [number, number, number] = [90, 90, 90]
+const GOLD = [...FOUNDATION_RGB.harvest] as [number, number, number]
+const INK = [...FOUNDATION_RGB.ink] as [number, number, number]
+const MUTED = [...FOUNDATION_RGB.muted] as [number, number, number]
 const PAGE_BOTTOM = 780
 const MARGIN = 48
 
